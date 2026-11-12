@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>계기철 선생님 수업·교육과정 자료</title>
+<meta name="description" content="광영고등학교 교육과정, 과학 수업, 진학, 데이터·코딩 수업 웹 페이지 모음">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Gowun+Batang:wght@700&display=swap" rel="stylesheet">
+<style>
+/* 레이아웃: 위에 묶음 바로가기, 아래로 묶음별 카드 목록 (모바일 1열) */
+:root {
+  --bg: #f4f5f2;
+  --surface: #ffffff;
+  --ink: #1d2421;
+  --muted: #5f6b66;
+  --line: #d9ddd8;
+  --accent: #23584a;
+  --accent-soft: #e1ece7;
+  --c-curri: #23584a;
+  --c-sci: #2f5d8a;
+  --c-admit: #8a5a1f;
+  --c-data: #6b4c8a;
+  --font-display: "Gowun Batang", "Nanum Myeongjo", serif;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --surface: #1c2320; --ink: #e5ebe8; --muted: #9aa8a2; --line: #303a36;
+    --accent: #7cc4ad; --accent-soft: #23342e;
+    --c-curri: #7cc4ad; --c-sci: #8ab8e6; --c-admit: #e3b26e; --c-data: #c3a6e6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1c2320; --ink: #e5ebe8; --muted: #9aa8a2; --line: #303a36;
+  --accent: #7cc4ad; --accent-soft: #23342e;
+  --c-curri: #7cc4ad; --c-sci: #8ab8e6; --c-admit: #e3b26e; --c-data: #c3a6e6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 56px; display: grid; gap: 28px; }
+header { display: grid; gap: 10px; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.school { color: var(--muted); font-size: 13.5px; }
+h1 { font-family: var(--font-display); font-size: 32px; line-height: 1.25; margin: 2px 0 0; text-wrap: balance; }
+.lead { color: var(--muted); max-width: 62ch; margin: 0; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 3px; gap: 3px; }
+.seg button { border: 0; background: transparent; padding: 5px 11px; border-radius: 7px; cursor: pointer; font: inherit; font-size: 13px; color: inherit; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+nav.jump { display: flex; flex-wrap: wrap; gap: 8px; }
+nav.jump a { text-decoration: none; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 6px 14px; font-size: 14px; font-weight: 500; }
+nav.jump a:hover { border-color: var(--accent); }
+nav.jump i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+nav.jump .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+section { display: grid; gap: 12px; scroll-margin-top: 16px; }
+.sec-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; border-bottom: 2px solid var(--sc); padding-bottom: 6px; }
+.sec-head h2 { margin: 0; font-size: 20px; color: var(--sc); }
+.sec-head p { margin: 0; color: var(--muted); font-size: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--sc); border-radius: 12px; padding: 16px 18px 14px; display: grid; gap: 8px; align-content: start; }
+.card h3 { margin: 0; font-size: 16.5px; line-height: 1.4; text-wrap: balance; }
+.card h3 a { text-decoration: none; }
+.card h3 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.card p { margin: 0; color: var(--muted); font-size: 14px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+.tag.old { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.links { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; margin-top: 2px; align-items: center; }
+.links a.go { font-weight: 600; color: var(--sc); text-decoration: none; }
+.links a.go:hover { text-decoration: underline; }
+.links .repo { color: var(--muted); }
+.links .date { color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+.card.old { opacity: .82; }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 14px; }
+@media (max-width: 480px) { .wrap { padding: 24px 16px 40px; } h1 { font-size: 26px; } .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="top">
+      <div>
+        <div class="school">광영고등학교 · 계기철 선생님</div>
+        <h1>수업·교육과정 자료 모음</h1>
+      </div>
+      <div class="seg" role="group" aria-label="화면 테마">
+        <button type="button" data-t="system">시스템</button>
+        <button type="button" data-t="light">밝게</button>
+        <button type="button" data-t="dark">어둡게</button>
+      </div>
+    </div>
+    <p class="lead">교육과정과 과목 선택, 과학 수업, 진학, 데이터·코딩 수업에 쓰는 웹 페이지를 묶음별로 모았어요. 제목을 누르면 페이지가 열려요.</p>
+    <nav class="jump" id="jump" aria-label="묶음 바로가기"></nav>
+  </header>
+  <main id="list"></main>
+  <footer>모든 페이지는 GitHub(<a href="https://github.com/gicheolkye">github.com/gicheolkye</a>)에 공개되어 있어요. 학생 개인정보를 다루는 도구는 올린 파일을 브라우저 안에서만 읽고 어디에도 전송하지 않아요.</footer>
+</div>
+<script>
+const U = r => `https://gicheolkye.github.io/${r}/`;
+const G = r => `https://github.com/gicheolkye/${r}`;
+const GROUPS = [
+  { id: "curriculum", title: "교육과정", color: "var(--c-curri)", desc: "학점 배당표, 과목 선택, 이수 점검",
+    items: [
+      { repo: "curriculum_kyhs", title: "교육과정 학점 배당표", desc: "2022 개정 교육과정에 따른 학년별 이수 과목과 학점 편성을 입학년도별(2025·2026)로 봐요.", tags: ["배당표"], date: "2026-07" },
+      { repo: "coursecheck_kyhs", title: "과목 선택 점검표 · 2·3학년", desc: "학생별 선택 과목 엑셀을 올리면 1학기→2학기 연계 조건에 어긋난 학생을 골라내고 사유를 기록해요.", tags: ["과목 선택", "2·3학년"], date: "2026-10" },
+      { repo: "credit_verifier_kyhs", title: "이수 과목 검증기", desc: "나이스 성적 엑셀을 올리면 학점 미충족·전입생·공동교육과정 시수 차이를 찾아 보고서로 저장해요.", tags: ["이수 점검", "전입생"], date: "2026-11" },
+      { repo: "my-website", title: "2028학년도 대학별 권장과목 탐색기", desc: "전국 47개 대학, 1,358개 모집단위의 핵심과목·권장과목을 검색하고 비교해요.", tags: ["권장과목", "2028 대입"], date: "2026-07" },
+      { repo: "2026_verify_subj_1", title: "과목 선택 점검표 · 3학년", desc: "3학년 연계 과목 선택 점검표의 7월판이에요. 지금은 2·3학년 점검표를 쓰세요.", tags: ["과목 선택"], old: true, date: "2026-07" }
+    ] },
+  { id: "science", title: "과학 수업", color: "var(--c-sci)", desc: "실험 시뮬레이션과 과학 시각화 자료",
+    items: [
+      { repo: "Earthquake-resistant_Design", title: "과학탐구실험2 내진설계 실험", desc: "추의 동조(TMD) 원리를 시뮬레이션해요. 빵끈 길이와 추의 질량을 바꾸며 구조물 흔들림을 비교해요.", tags: ["과학탐구실험2", "시뮬레이션"], date: "2026-09" },
+      { repo: "2026gicheolkye", title: "Mayavi 3D 과학 시각화 안내서", desc: "파이썬 3D 과학 데이터 시각화 도구 Mayavi 사용자 안내서예요.", tags: ["Python", "3D 시각화"], date: "2026-08" }
+    ] },
+  { id: "admission", title: "진학", color: "var(--c-admit)", desc: "대입 결과 분석과 면접 준비",
+    items: [
+      { repo: "2026_admission_stat", title: "광영고 11개년 대입 분석", desc: "2016~2026학년도 지원·합격을 전형·내신·상위권 진학까지 정리한 대시보드예요. 4년제와 전문대를 나눠 봐요.", tags: ["대입 결과"], date: "2026-10" },
+      { repo: "2026KY_interview_simulation", title: "생기부 맞춤 면접 연습기", desc: "내 생기부 문장에서 꼬리질문을 뽑아 시간을 재며 소리 내어 연습해요.", tags: ["면접"], date: "2026-09" },
+      { repo: "admission2026kyhs", title: "광영고 11개년 대입 분석 (2016~2026)", desc: "대입 분석의 7월판이에요. 지금은 위의 최신판을 쓰세요.", tags: ["대입 결과"], old: true, date: "2026-07" }
+    ] },
+  { id: "data", title: "데이터·코딩 수업", color: "var(--c-data)", desc: "공공데이터 분석과 웹 서비스 만들기",
+    items: [
+      { repo: "2026policysuggestion", title: "우리 동네 인구구조와 가장 비슷한 지역 찾기", desc: "공공 인구 데이터로 CSV 읽기, 유사도 계산, 그래프 그리기를 단계별로 익히는 정책 제안 프로젝트 강의 노트예요.", tags: ["Python", "공공데이터", "강의 노트"], date: "2026-08" },
+      { repo: "2026dataset", title: "2026 연령별 인구 데이터", desc: "강의 노트에서 쓰는 2026년 6월 기준 행정구역별 연령 인구 CSV(age.csv)예요.", tags: ["데이터"], noPage: true, date: "2026-07" },
+      { repo: "2025dataset", title: "2025 연령별 인구 데이터", desc: "같은 형식의 이전 연도 인구 CSV(age.csv)예요.", tags: ["데이터"], noPage: true, date: "2026-07" },
+      { repo: "gicheolkye", title: "나의 첫 웹 서비스 만들기 (Streamlit)", desc: "Streamlit으로 입력창·버튼을 만들고 국가별 MBTI 외향·내향 비율을 그래프로 비교하는 실습 코드예요.", tags: ["Streamlit", "실습 코드"], noPage: true, date: "2025-09" }
+    ] }
+];
+
+const jump = document.getElementById("jump"), list = document.getElementById("list");
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+GROUPS.forEach(g => {
+  const live = g.items.filter(i => !i.old).length;
+  jump.insertAdjacentHTML("beforeend", `<a href="#${g.id}" style="--sc:${g.color}"><i style="background:${g.color}"></i>${g.title} <span class="n">${g.items.length}</span></a>`);
+  const cards = g.items.map(i => {
+    const main = i.noPage ? G(i.repo) : U(i.repo);
+    return `<article class="card${i.old ? " old" : ""}">
+      <div class="tags">${i.old ? '<span class="tag old">이전 버전</span>' : ""}${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>
+      <h3><a href="${main}">${esc(i.title)}</a></h3>
+      <p>${esc(i.desc)}</p>
+      <div class="links">
+        <a class="go" href="${main}">${i.noPage ? "저장소 열기" : "페이지 열기"}</a>
+        ${i.noPage ? "" : `<a class="repo" href="${G(i.repo)}">저장소</a>`}
+        <span class="date">${i.date}</span>
+      </div>
+    </article>`;
+  }).join("");
+  list.insertAdjacentHTML("beforeend", `<section id="${g.id}" style="--sc:${g.color}">
+    <div class="sec-head"><h2>${g.title}</h2><p>${g.desc}</p></div>
+    <div class="grid">${cards}</div></section>`);
+});
+list.style.display = "grid"; list.style.gap = "28px";
+
+const HOST = document.documentElement.getAttribute("data-theme");
+function theme(m) {
+  const r = document.documentElement;
+  if (m === "light" || m === "dark") r.setAttribute("data-theme", m); else if (HOST) r.setAttribute("data-theme", HOST); else r.removeAttribute("data-theme");
+  document.querySelectorAll("[data-t]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.t === m)));
+  try { localStorage.setItem("hub-theme", m); } catch (e) {}
+}
+document.querySelectorAll("[data-t]").forEach(b => b.addEventListener("click", () => theme(b.dataset.t)));
+let t0 = "system"; try { t0 = localStorage.getItem("hub-theme") || "system"; } catch (e) {}
+theme(t0);
+</script>
+</body>
+</html>
