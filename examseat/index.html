@@ -94,6 +94,20 @@
   .ovr li{display:flex;align-items:center;gap:8px;padding:2px 0}
   .ovr button{padding:2px 9px;font-size:12.5px}
   button.small{padding:4px 10px;font-size:13px}
+  table.wait{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.wait th{font-weight:500;color:var(--muted);text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);background:#f7f6f2}
+  table.wait td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.wait input[type=text]{font:inherit;font-size:13.5px;padding:5px 8px;border:1px solid #cfd3cf;border-radius:6px;width:100%;max-width:240px}
+  table.wait input.set{border-color:var(--accent);background:var(--accent-soft)}
+  table.wait .n{font-weight:700}
+  .clsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 12px;margin-top:8px}
+  .clsGrid label{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+  .clsGrid label span{min-width:58px}
+  .clsGrid input[type=text]{max-width:none}
+  .names{margin-top:8px;font-size:12.5px;color:var(--muted);line-height:1.7}
+  .linkbtn{border:none;background:none;color:var(--accent);padding:2px 4px;font-size:13px;text-decoration:underline;text-underline-offset:3px}
+  table.grid td.hl small{display:block;font-size:11.5px;color:#6b5a00}
+  table.grid td.hl small.none{color:#a4461d}
   .hidden{display:none!important}
   #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d2321;color:#fff;padding:10px 18px;border-radius:8px;font-size:13.5px;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:90vw}
   #toast.show{opacity:1}
@@ -156,6 +170,7 @@
     <div class="tabs" id="tabs">
       <button data-t="tt" class="on">개인 시간표</button>
       <button data-t="sum">고사실별 현황</button>
+      <button data-t="wait">대기 장소</button>
       <button data-t="seat">좌석표</button>
     </div>
 
@@ -163,17 +178,28 @@
       <div class="row">
         <select id="ttGrade"></select>
         <input type="search" id="ttSearch" placeholder="학번 또는 이름 검색" style="width:200px">
-        <label class="muted" style="font-size:13px"><input type="checkbox" id="ttOnlyHl"> 노란 칸 있는 학생만</label>
+        <label class="muted" style="font-size:13px"><input type="checkbox" id="ttOnlyHl"> 대기가 필요한 학생만</label>
         <span class="spacer"></span>
         <span class="muted" id="ttCount" style="font-size:13px"></span>
       </div>
       <div class="scroll" style="margin-top:10px"><table class="grid" id="ttTable"></table></div>
-      <div class="legend"><span><i></i>같은 날 앞뒤 교시 사이에 끼인 미응시(공강) — 학생 대기 장소 확인용</span></div>
+      <div class="legend"><span><i></i>미응시인데 그날 뒤에 볼 시험이 남은 칸(1교시 미응시·시험 사이 미응시) — 대기 장소가 필요한 학생</span></div>
     </div>
 
     <div data-p="sum" class="hidden">
       <p class="sub" style="margin-bottom:10px">명렬표 기준, 날짜별로 각 고사실에서 치르는 과목과 인원입니다. 맨 아래는 날짜별 과목 합계입니다.</p>
       <div class="scroll"><table class="grid" id="sumTable"></table></div>
+    </div>
+
+    <div data-p="wait" class="hidden">
+      <p class="sub" style="margin-bottom:10px">노란 칸(그날 뒤에 시험이 남아 있는 미응시) 학생들이 기다릴 장소를 적어 주세요. 교시마다 한 곳을 적거나, 인원이 많으면 <b>반별로 나누기</b>로 반마다 다른 장소를 줄 수 있습니다. 적은 장소는 개인 시간표 칸(“대기: ○○”)과 엑셀의 <b>대기 명단</b> 시트에 들어갑니다.</p>
+      <div class="row" style="margin-bottom:10px">
+        <input type="text" id="waitAll" placeholder="예: 도서관" style="font:inherit;font-size:13.5px;padding:5px 8px;border:1px solid #cfd3cf;border-radius:6px;width:180px">
+        <button class="small" id="waitAllBtn">비어 있는 교시에 모두 넣기</button>
+        <span class="spacer"></span>
+        <span class="muted" id="waitStat" style="font-size:13px"></span>
+      </div>
+      <div class="scroll" style="max-height:none"><table class="wait" id="waitTable"></table></div>
     </div>
 
     <div data-p="seat" class="hidden">
@@ -368,13 +394,17 @@
       if (cur && cur.d === d && c === cur.cols[cur.cols.length - 1] + 1) cur.cols.push(c);
       else { cur = { d, cols: [c] }; groups.push(cur); }
     }
+    // 미응시인데 같은 날 뒤에 볼 시험이 남아 있으면 → 학교에서 기다려야 하므로 강조
+    // (1교시 미응시, 시험 사이 미응시, 연속 미응시 모두 포함 / 마지막 시험 뒤 미응시는 제외)
     const isMiss = v => S(v).includes('*미응시');
+    const isExam = v => S(v) !== '' && !isMiss(v);
     for (let r = 1; r < rows.length; r++) {
       for (const g of groups) {
-        if (g.cols.length < 3) continue;
-        for (let k = 1; k < g.cols.length - 1; k++) {
-          const a = rows[r][g.cols[k - 1]], b = rows[r][g.cols[k]], c = rows[r][g.cols[k + 1]];
-          if (isMiss(b) && !isMiss(a) && S(a) && !isMiss(c) && S(c)) set.add(r + ',' + g.cols[k]);
+        let examLater = false;
+        for (let k = g.cols.length - 1; k >= 0; k--) {
+          const v = rows[r][g.cols[k]];
+          if (isMiss(v) && examLater) set.add(r + ',' + g.cols[k]);
+          if (isExam(v)) examLater = true;
         }
       }
     }
@@ -490,6 +520,26 @@
     return applied;
   }
 
+  // 대기 학생 목록 (노란 칸)
+  function waitList(grades) {
+    const out = [];
+    for (const g of grades) {
+      const t = g.timetable; if (!t) continue;
+      const h = t.rows[0].map(S), iId = h.indexOf('학번'), iNm = h.indexOf('이름');
+      for (const key of t.highlights) {
+        const [r, c] = key.split(',').map(Number);
+        const id = S(t.rows[r][iId]);
+        out.push({ grade: g.grade, period: h[c], r, c, id, name: S(t.rows[r][iNm]), cls: parseInt(id.slice(1, 3), 10) || 0 });
+      }
+    }
+    out.sort((a, b) => a.period.localeCompare(b.period) || a.grade - b.grade || a.id.localeCompare(b.id));
+    return out;
+  }
+  function waitPlaceFor(places, grade, period, cls) {
+    if (!places) return '';
+    return S(places[grade + '|' + period + '|' + cls]) || S(places[grade + '|' + period]) || '';
+  }
+
   // 결과 엑셀 (ExcelJS)
   async function buildWorkbook(ExcelJS, res) {
     const wb = new ExcelJS.Workbook();
@@ -522,11 +572,28 @@
             cell.border = border;
             cell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'center' };
             if (rn === 1) { cell.font = { bold: true }; cell.fill = headFill; }
-            else if (t.highlights.has((rn - 1) + ',' + (cn - 1))) cell.fill = yellow;
+            else if (t.highlights.has((rn - 1) + ',' + (cn - 1))) {
+              cell.fill = yellow;
+              const id = S(t.rows[rn - 1][1]);
+              const place = waitPlaceFor(res.waitPlaces, g.grade, S(t.rows[0][cn - 1]), parseInt(id.slice(1, 3), 10) || 0);
+              if (place) cell.value = '*미응시\n대기: ' + place;
+            }
           });
         });
         ws.views = [{ state: 'frozen', xSplit: 3, ySplit: 1 }];
       }
+    }
+    const waits = waitList(res.grades);
+    if (waits.length) {
+      const ws = wb.addWorksheet('대기 명단');
+      ws.addRow(['교시', '학년', '반', '학번', '이름', '대기 장소']);
+      const rowsW = waits.map(w => ({ ...w, place: waitPlaceFor(res.waitPlaces, w.grade, w.period, w.cls) || '(미정)' }));
+      rowsW.sort((a, b) => a.period.localeCompare(b.period) || a.place.localeCompare(b.place, 'ko') || a.id.localeCompare(b.id));
+      rowsW.forEach(w => ws.addRow([w.period.replace(/^(.*\))\s*(\d+)$/, '$1 $2교시'), w.grade, w.cls, Number(w.id) || w.id, w.name, w.place]));
+      ws.columns.forEach((col, i) => { col.width = [18, 7, 6, 9, 11, 22][i]; });
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+      ws.autoFilter = { from: 'A1', to: 'F1' };
+      ws.eachRow((row, rn) => row.eachCell(cell => { cell.border = border; cell.alignment = { horizontal: 'center' }; if (rn === 1) { cell.font = { bold: true }; cell.fill = headFill; } else if (cell.value === '(미정)') cell.font = { color: { argb: 'FFC00000' } }; }));
     }
     if (res.overrides && res.overrides.length) {
       const ws = wb.addWorksheet('고사실 변경 내역');
@@ -557,7 +624,7 @@
     return wb.xlsx.writeBuffer();
   }
 
-  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, convertCell, buildWorkbook, applyRoomOverrides };
+  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor };
   if (typeof module !== 'undefined') module.exports = root.ExamCore;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -572,6 +639,9 @@ const $ = s => document.querySelector(s);
 const KIND = { course: '강좌목록', roster: '고사실별 명렬표', timetable: '개인 시간표' };
 let files = [];      // {id,name,rows,kind,grade,info}
 let result = null;
+let waitPlaces = {};  // '학년|교시' 또는 '학년|교시|반' → 장소
+try { waitPlaces = JSON.parse(localStorage.getItem('examseat.waitPlaces') || '{}') || {}; } catch (e) { waitPlaces = {}; }
+const saveWaits = () => { try { localStorage.setItem('examseat.waitPlaces', JSON.stringify(waitPlaces)); } catch (e) {} };
 let overrides = [];   // 고사실 수동 변경 {period, subject, from, to}
 let uid = 0;
 
@@ -735,7 +805,7 @@ function run(keepView) {
       cf.forEach(c => warnings.push(`<b>${periodLabel(p)} ${roomLabel(c.room)}(${c.room})</b>: ` + Object.entries(c.subjects).map(([s, n]) => `${s} ${n}명`).join(' + ') + ` 이(가) 같은 고사실에 배정되어 좌석 ${c.dup}개가 겹칩니다. 강좌목록의 장소를 확인하세요.`));
     }
   }
-  result = { grades, summary, periods, tts, conflicts, warnings, overrides, applied };
+  result = { grades, summary, periods, tts, conflicts, warnings, overrides, applied, waitPlaces, waits: C.waitList(grades) };
   renderResult(keepView);
 }
 
@@ -747,7 +817,7 @@ function renderResult(keepView) {
   const hl = R.tts.reduce((a, t) => a + t.highlights.size, 0);
   const rooms = R.summary.rooms.length;
   $('#chips').innerHTML = [
-    ['학생', students + '명'], ['교시', R.periods.length + '개'], ['고사실', rooms + '곳'], ['노란 칸(공강 미응시)', hl + '칸'],
+    ['학생', students + '명'], ['교시', R.periods.length + '개'], ['고사실', rooms + '곳'], ['노란 칸(대기 필요)', hl + '칸'],
   ].map(([k, v]) => `<div class="chip">${k}<b>${v}</b></div>`).join('');
   const w = $('#warns');
   w.classList.toggle('hidden', !R.warnings.length);
@@ -763,6 +833,7 @@ function renderResult(keepView) {
   seatCache.clear();
   renderSeats();
   renderOverrides();
+  renderWait();
   if (!keepView) $('#resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -771,6 +842,7 @@ $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   $('#tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('[data-p]').forEach(p => p.classList.toggle('hidden', p.dataset.p !== b.dataset.t));
+  if (b.dataset.t === 'tt' && result) renderTT();
 });
 
 // ---------- 개인 시간표 미리보기 ----------
@@ -792,13 +864,88 @@ function renderTT() {
     n++;
     html += '<tr>' + row.map((v, c) => {
       if (c < 3) return `<td class="s" style="left:${lefts[c]}px;min-width:${widths[c]}px;max-width:${widths[c]}px">${esc(v)}</td>`;
-      const cls = t.highlights.has(r + ',' + c) ? 'hl' : S(v).includes('미응시') ? 'miss' : /학년 \d+반$/.test(S(v)) ? 'home' : '';
+      if (t.highlights.has(r + ',' + c)) {
+        const place = C.waitPlaceFor(waitPlaces, g.grade, S(h[c]), parseInt(S(row[iId]).slice(1, 3), 10) || 0);
+        return `<td class="hl">${esc(v)}${place ? `<small>대기: ${esc(place)}</small>` : '<small class="none">대기 장소 미정</small>'}</td>`;
+      }
+      const cls = S(v).includes('미응시') ? 'miss' : /학년 \d+반$/.test(S(v)) ? 'home' : '';
       return `<td class="${cls}">${esc(v)}</td>`;
     }).join('') + '</tr>';
   }
   tbl.innerHTML = html + '</tbody>';
   $('#ttCount').textContent = n + '명 표시';
 }
+
+// ---------- 대기 장소 ----------
+const openCls = new Set();   // 반별로 펼친 '학년|교시'
+function waitGroups() {
+  const groups = new Map();
+  for (const w of result.waits) {
+    const k = w.grade + '|' + w.period;
+    if (!groups.has(k)) groups.set(k, { grade: w.grade, period: w.period, list: [] });
+    groups.get(k).list.push(w);
+  }
+  return [...groups.values()];
+}
+function waitStat() {
+  const total = result.waits.length;
+  const done = result.waits.filter(w => C.waitPlaceFor(waitPlaces, w.grade, w.period, w.cls)).length;
+  $('#waitStat').innerHTML = total ? `장소가 정해진 학생 <b>${done}</b> / ${total}칸` : '';
+  return { total, done };
+}
+function renderWait() {
+  const tbl = $('#waitTable');
+  const groups = waitGroups();
+  if (!groups.length) { tbl.innerHTML = '<tr><td class="muted" style="padding:20px">대기가 필요한 학생이 없습니다.</td></tr>'; waitStat(); return; }
+  tbl.innerHTML = '<thead><tr><th style="width:150px">교시</th><th style="width:60px">학년</th><th style="width:80px">대기 학생</th><th>대기 장소</th></tr></thead><tbody>' +
+    groups.map(gr => {
+      const k = gr.grade + '|' + gr.period;
+      const byCls = {};
+      gr.list.forEach(w => (byCls[w.cls] = byCls[w.cls] || []).push(w));
+      const clsKeys = Object.keys(byCls).map(Number).sort((a, b) => a - b);
+      const open = openCls.has(k);
+      const base = waitPlaces[k] || '';
+      return `<tr data-k="${esc(k)}">
+        <td><b>${esc(periodLabel(gr.period))}</b></td>
+        <td>${gr.grade}학년</td>
+        <td><span class="n">${gr.list.length}</span>명</td>
+        <td>
+          <div class="row" style="gap:8px">
+            <input type="text" data-key="${esc(k)}" value="${esc(base)}" placeholder="장소 입력 (예: 도서관)" class="${base ? 'set' : ''}">
+            <button class="linkbtn tgCls">${open ? '반별 접기' : '반별로 나누기'}</button>
+            <button class="linkbtn tgNames">명단 보기</button>
+          </div>
+          ${open ? `<div class="clsGrid">${clsKeys.map(cl => { const kk = k + '|' + cl, v = waitPlaces[kk] || ''; return `<label><span>${cl}반 ${byCls[cl].length}명</span><input type="text" data-key="${esc(kk)}" value="${esc(v)}" placeholder="${esc(base || '장소')}" class="${v ? 'set' : ''}"></label>`; }).join('')}</div>` : ''}
+          <div class="names hidden">${clsKeys.map(cl => `<b>${cl}반</b> ` + byCls[cl].map(w => `${esc(w.id)} ${esc(w.name)}`).join(', ')).join('<br>')}</div>
+        </td></tr>`;
+    }).join('') + '</tbody>';
+  tbl.querySelectorAll('input[type=text]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const v = inp.value.trim();
+      if (v) waitPlaces[inp.dataset.key] = v; else delete waitPlaces[inp.dataset.key];
+      inp.classList.toggle('set', !!v);
+      // 반 칸의 placeholder를 교시 장소에 맞춰 갱신
+      if (inp.dataset.key.split('|').length === 2) inp.closest('td').querySelectorAll('.clsGrid input').forEach(ci => ci.placeholder = v || '장소');
+      saveWaits(); waitStat();
+    });
+    inp.addEventListener('change', renderTT);
+  });
+  tbl.querySelectorAll('.tgCls').forEach(b => b.addEventListener('click', () => {
+    const k = b.closest('tr').dataset.k; openCls.has(k) ? openCls.delete(k) : openCls.add(k); renderWait();
+  }));
+  tbl.querySelectorAll('.tgNames').forEach(b => b.addEventListener('click', () => {
+    const n = b.closest('td').querySelector('.names'); n.classList.toggle('hidden'); b.textContent = n.classList.contains('hidden') ? '명단 보기' : '명단 접기';
+  }));
+  waitStat();
+}
+$('#waitAllBtn').addEventListener('click', () => {
+  const v = $('#waitAll').value.trim();
+  if (!v) { toast('넣을 장소를 먼저 적어 주세요.'); return; }
+  let n = 0;
+  waitGroups().forEach(gr => { const k = gr.grade + '|' + gr.period; if (!waitPlaces[k]) { waitPlaces[k] = v; n++; } });
+  saveWaits(); renderWait(); renderTT();
+  toast(n ? `${n}개 교시에 “${v}”을(를) 넣었습니다.` : '비어 있는 교시가 없습니다.');
+});
 
 // ---------- 고사실 현황 ----------
 function renderSummary() {
