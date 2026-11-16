@@ -22,6 +22,7 @@
   --c-sci: #2f5d8a;
   --c-admit: #8a5a1f;
   --c-data: #6b4c8a;
+  --c-exam: #9a3b3b;
   --font-display: "Gowun Batang", "Nanum Myeongjo", serif;
   --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   color-scheme: light;
@@ -30,14 +31,14 @@
   :root:not([data-theme="light"]) {
     --bg: #141917; --surface: #1c2320; --ink: #e5ebe8; --muted: #9aa8a2; --line: #303a36;
     --accent: #7cc4ad; --accent-soft: #23342e;
-    --c-curri: #7cc4ad; --c-sci: #8ab8e6; --c-admit: #e3b26e; --c-data: #c3a6e6;
+    --c-curri: #7cc4ad; --c-sci: #8ab8e6; --c-admit: #e3b26e; --c-data: #c3a6e6; --c-exam: #e69a9a;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #141917; --surface: #1c2320; --ink: #e5ebe8; --muted: #9aa8a2; --line: #303a36;
   --accent: #7cc4ad; --accent-soft: #23342e;
-  --c-curri: #7cc4ad; --c-sci: #8ab8e6; --c-admit: #e3b26e; --c-data: #c3a6e6;
+  --c-curri: #7cc4ad; --c-sci: #8ab8e6; --c-admit: #e3b26e; --c-data: #c3a6e6; --c-exam: #e69a9a;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -113,6 +114,10 @@ const GROUPS = [
       { repo: "credit_verifier_kyhs", title: "이수 과목 검증기", desc: "나이스 성적 엑셀을 올리면 학점 미충족·전입생·공동교육과정 시수 차이를 찾아 보고서로 저장해요.", tags: ["이수 점검", "전입생"], date: "2026-11" },
       { repo: "my-website", title: "2028학년도 대학별 권장과목 탐색기", desc: "전국 47개 대학, 1,358개 모집단위의 핵심과목·권장과목을 검색하고 비교해요.", tags: ["권장과목", "2028 대입"], date: "2026-07" }
     ] },
+  { id: "exam", title: "시험 운영", color: "var(--c-exam)", desc: "정기고사 시간표와 고사실 좌석 배치",
+    items: [
+      { repo: "examseat", src: "https://github.com/gicheolkye/gicheolkye.github.io/tree/main/examseat", title: "시험 시간표 · 좌석표 생성기", desc: "리로스쿨 강좌목록·고사실별 명렬표·개인별 시간표를 올리면 우리 학교 양식 시간표, 고사실 현황, 고사실별 좌석표(PNG·PDF)를 만들어요. 겹치는 고사실은 바로 바꿀 수 있어요.", tags: ["정기고사", "좌석표", "리로스쿨"], date: "2026-11" }
+    ] },
   { id: "science", title: "과학 수업", color: "var(--c-sci)", desc: "실험 시뮬레이션과 분자 모델링 탐구",
     items: [
       { repo: "advchem_modeling_kyhs", title: "고급화학 분자 모델링 탐구", desc: "앰피실린 분자 도킹, CERKL 돌연변이 구조 예측, 시냅토태그민 Ca²⁺ 도킹까지 세 가지 탐구 활동 보고서를 모았어요.", tags: ["고급화학", "분자 도킹", "AlphaFold"], date: "2026-11" },
@@ -143,7 +148,7 @@ GROUPS.forEach(g => {
       <p>${esc(i.desc)}</p>
       <div class="links">
         <a class="go" href="${main}">${i.noPage ? "저장소 열기" : "페이지 열기"}</a>
-        ${i.noPage ? "" : `<a class="repo" href="${G(i.repo)}">저장소</a>`}
+        ${i.noPage ? "" : `<a class="repo" href="${i.src || G(i.repo)}">저장소</a>`}
         <span class="date">${i.date}</span>
       </div>
     </article>`;
