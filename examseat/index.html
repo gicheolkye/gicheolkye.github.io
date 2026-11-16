@@ -123,6 +123,26 @@
   .steps .row{margin-top:8px}
   textarea.code{width:100%;height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:8px;background:#fafaf8;color:#444;resize:vertical}
   .note{background:#f7f6f2;border-radius:8px;padding:10px 12px;font-size:13px;color:var(--muted);margin-top:12px}
+  table.sched{border-collapse:collapse;width:100%;font-size:13px;min-width:720px}
+  table.sched th,table.sched td{border:1px solid #9aa19d;padding:6px 6px;text-align:center;vertical-align:middle}
+  table.sched thead th{background:#fde1e4;font-weight:700}
+  table.sched td.g{font-size:22px;font-weight:800}
+  table.sched td.p{font-weight:700;font-style:italic}
+  table.sched td.tm{font-size:12px;white-space:nowrap}
+  table.sched td.tm small{display:block;color:#1f5fd6;font-weight:700}
+  table.sched tr.g1 td.hd{background:#fde9a9} table.sched tr.g2 td.hd{background:#cdeffd} table.sched tr.g3 td.hd{background:#d9d9d9}
+  table.sched td.slot{min-width:110px;height:56px;transition:background .1s}
+  table.sched td.slot.over{background:#e6efe9;outline:2px dashed var(--accent);outline-offset:-3px}
+  table.sched td.slot.pick{background:#f3faf6;cursor:pointer}
+  table.sched tr.extra td{border-style:dashed;color:#aaa}
+  table.sched tr.extra td.tm{font-style:italic}
+  .chip2{display:inline-block;margin:2px 0;padding:3px 7px;border-radius:6px;background:#fff;border:1px solid #cfd3cf;cursor:grab;line-height:1.35;user-select:none}
+  .chip2:hover{border-color:var(--accent)}
+  .chip2.sel{outline:2px solid var(--accent);background:var(--accent-soft)}
+  .chip2.moved{border-color:#e7a37f;background:#fff7f2}
+  .chip2 em{font-style:normal;color:#e00000;font-weight:700}
+  .timeGrid{display:grid;grid-template-columns:auto repeat(3,auto);gap:4px 8px;align-items:center;font-size:13px}
+  .timeGrid input{width:74px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px}
   .envs{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-top:14px}
   .envs .room canvas{border:1px solid var(--line)}
   .hidden{display:none!important}
@@ -191,6 +211,7 @@
       <button data-t="seat">좌석표</button>
       <button data-t="env">시험지 봉투</button>
       <button data-t="stu">학생 조회</button>
+      <button data-t="sched">일정표</button>
     </div>
 
     <div data-p="tt">
@@ -271,6 +292,35 @@
         <button class="small primary" id="envHwpxAll">전체 한 파일</button>
       </div>
       <div class="envs" id="envs"></div>
+    </div>
+
+    <div data-p="sched" class="hidden">
+      <p class="sub" style="margin-bottom:12px">불러온 학년의 시험 일정표를 학교 양식으로 만듭니다. 아래 표에서 <b>과목을 끌어다 다른 날짜·교시 칸에 놓으면</b>(또는 과목을 누른 뒤 옮길 칸을 누르면) 개인 시간표·고사실 현황·좌석표·봉투·학생 조회까지 모두 그 시간으로 바뀝니다. 그 시간에 이미 다른 시험이 있는 학생이 있으면 옮기지 않고 알려 줍니다.</p>
+      <div class="ovr hidden" id="mvList" style="margin:0 0 12px"></div>
+      <div class="row" style="margin-bottom:8px">
+        <label class="muted" style="font-size:13px">날짜 추가 <input type="date" id="schedAddDate" style="font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px"></label>
+        <button class="small" id="schedAddBtn">열 추가</button>
+        <span class="muted" style="font-size:12.5px">맨 아래 점선 줄은 새 교시입니다. 과목을 놓으면 그 교시가 생깁니다.</span>
+      </div>
+      <div class="scroll" style="max-height:none"><table class="sched" id="schedGrid"></table></div>
+      <div class="row" style="margin-top:14px">
+        <span class="muted" style="font-size:13px;min-width:74px">내려받기</span>
+        <button class="small primary" id="schedPdf">PDF</button>
+        <button class="small" id="schedPng">이미지(PNG)</button>
+        <button class="small" id="schedXlsx">엑셀(고칠 수 있음)</button>
+      </div>
+      <details class="opts" open style="margin-top:14px"><summary><b>일정표 꾸미기</b> — 제목·시간·학점·안내 문구</summary>
+        <div class="envCfg" style="margin-top:10px">
+          <label for="schedTitle">제목</label><input type="text" id="schedTitle">
+          <label>학교 로고</label><div class="row"><input type="file" id="schedLogo" accept="image/*" style="font-size:12.5px"><button class="small" id="schedLogoDel">로고 빼기</button><span class="muted" style="font-size:12px">제목 왼쪽에 들어갑니다(선택). 이 브라우저에 기억됩니다.</span></div>
+          <label for="schedArrive">등교 시각</label><input type="text" id="schedArrive" style="max-width:120px">
+          <label>인원 표시</label><label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" id="schedShowAll" style="width:auto"> 학년 전체가 보는 과목도 [명] 표시</label>
+          <label>교시별 시간</label><div class="timeGrid" id="schedTimes"></div>
+          <label for="schedNotes">안내 문구</label><div><textarea id="schedNotes" rows="3" style="width:100%;max-width:620px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid #cfd3cf;border-radius:6px"></textarea><div class="muted" style="font-size:12px">한 줄에 하나씩. 맨 앞에 “등교 시각·학년별 재적 현황” 줄은 자동으로 들어갑니다.</div></div>
+        </div>
+        <div style="margin-top:8px"><b style="font-size:13.5px">과목 학점</b> <span class="muted" style="font-size:12.5px">이동수업 과목은 강좌목록의 주당 시수로 미리 채웠습니다. 비우면 (학점) 없이 나옵니다.</span></div>
+        <div class="scroll" style="max-height:300px;margin-top:6px"><table class="wait" id="schedCredits"></table></div>
+      </details>
     </div>
 
     <div data-p="stu" class="hidden">
@@ -885,6 +935,151 @@
     return { data: out, missing };
   }
 
+  // 과목 시험 시간 옮기기: moves = [{grade, subject, from:'11-16(월)1', to:'11-17(화)3'}]
+  //  - 해당 과목을 보는 학생의 칸을 새 교시 칸으로 옮기고(고사실·좌석 그대로), 원래 칸은 '*미응시'
+  //  - 새 교시 칸이 없으면 만들고, 열은 날짜·교시 순으로 다시 정렬
+  //  - 그 시간에 이미 다른 시험이 있는 학생은 옮기지 않고 conflicts에 담음
+  const slotKey = h => { const m = /^(\d{2})-(\d{2})\((.)\)\s*(\d+)$/.exec(S(h)); return m ? Number(m[1]) * 10000 + Number(m[2]) * 100 + Number(m[4]) : 1e9; };
+  const slotLabel = h => S(h).replace(/^(\d{2}-\d{2}\(.\))\s*(\d+)$/, '$1 $2교시');
+  function ensureSlot(t, slot) {
+    const h = t.rows[0].map(S);
+    if (h.includes(slot)) return;
+    t.rows.forEach((row, r) => row.push(r === 0 ? slot : '*미응시'));
+    const first = t.dataCols.length ? Math.min(...t.dataCols) : t.rows[0].length - 1;
+    const fixed = [...Array(first).keys()];
+    const data = [...Array(t.rows[0].length - first).keys()].map(i => i + first).filter(i => S(t.rows[0][i]));
+    data.sort((a, b) => slotKey(t.rows[0][a]) - slotKey(t.rows[0][b]));
+    const order = fixed.concat(data);
+    t.rows = t.rows.map(row => order.map(i => row[i] === undefined ? '' : row[i]));
+    t.dataCols = data.map((_, k) => first + k);
+  }
+  function applySubjectMoves(grades, moves) {
+    const report = moves.map(() => ({ moved: 0, conflicts: [] }));
+    moves.forEach((mv, i) => {
+      const g = grades.find(x => x.grade === mv.grade); if (!g || !g.timetable) return;
+      const t = g.timetable;
+      if (!S(mv.to) || mv.to === mv.from) return;
+      ensureSlot(t, mv.to);
+      const h = t.rows[0].map(S), cf = h.indexOf(mv.from), ct = h.indexOf(mv.to);
+      if (cf < 0 || ct < 0) return;
+      const iId = h.indexOf('학번'), iNm = h.indexOf('이름');
+      for (let r = 1; r < t.rows.length; r++) {
+        const v = S(t.rows[r][cf]); if (!v || v.includes('미응시')) continue;
+        const L = v.split('\n'); if (L[0].trim() !== mv.subject) continue;
+        const tv = S(t.rows[r][ct]);
+        if (tv && !tv.includes('미응시')) { report[i].conflicts.push(`${S(t.rows[r][iId])} ${S(t.rows[r][iNm])}(${tv.split('\n')[0]})`); continue; }
+        if (L.length > 1) L[1] = slotLabel(mv.to);
+        t.rows[r][ct] = L.join('\n'); t.rows[r][cf] = '*미응시';
+        report[i].moved++;
+      }
+      if (g.roster) {   // 명렬표 기록도 새 날짜·교시로
+        const d = mv.to.slice(0, 5), p = mv.to.replace(/^.*\)/, ''), fd = mv.from.slice(0, 5), fp = mv.from.replace(/^.*\)/, '');
+        g.roster.records.forEach(rec => { if (rec.subj === mv.subject && rec.date === fd && rec.period === fp) { rec.date = d; rec.period = p; } });
+      }
+    });
+    // 강조(대기 필요) 다시 계산
+    for (const g of grades) if (g.timetable && moves.some(m => m.grade === g.grade)) g.timetable.highlights = computeHighlights(g.timetable.rows, g.timetable.dataCols);
+    return report;
+  }
+  // 옮기기 전에 미리 확인 (실제로 바꾸지 않음)
+  function checkSubjectMove(g, mv) {
+    const t = g.timetable, h = t.rows[0].map(S), cf = h.indexOf(mv.from), ct = h.indexOf(mv.to);
+    const iId = h.indexOf('학번'), iNm = h.indexOf('이름');
+    const out = { students: 0, conflicts: [] };
+    if (cf < 0) return out;
+    for (let r = 1; r < t.rows.length; r++) {
+      const v = S(t.rows[r][cf]); if (!v || v.split('\n')[0].trim() !== mv.subject) continue;
+      out.students++;
+      const tv = ct >= 0 ? S(t.rows[r][ct]) : '';
+      if (tv && !tv.includes('미응시')) out.conflicts.push(`${S(t.rows[r][iId])} ${S(t.rows[r][iNm])}(${tv.split('\n')[0]})`);
+    }
+    return out;
+  }
+
+  // 시험 일정표 데이터: 학년 × 교시 × 날짜 → 과목별 응시 인원
+  function scheduleData(grades) {
+    const dates = new Set(), out = [];
+    for (const g of grades) {
+      const t = g.timetable; if (!t) continue;
+      const h = t.rows[0].map(S), total = t.rows.length - 1;
+      const cells = {}; let maxP = 0;
+      for (const c of t.dataCols) {
+        const m = /^(\d{2}-\d{2}\(.\))\s*(\d+)$/.exec(h[c]); if (!m) continue;
+        const d = m[1], p = Number(m[2]); dates.add(d); maxP = Math.max(maxP, p);
+        const cnt = {};
+        for (let r = 1; r < t.rows.length; r++) {
+          const v = S(t.rows[r][c]); if (!v || v.includes('미응시')) continue;
+          const subj = v.split('\n')[0].trim(); if (subj) cnt[subj] = (cnt[subj] || 0) + 1;
+        }
+        cells[d + '|' + p] = Object.entries(cnt).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko')).map(([subject, count]) => ({ subject, count }));
+      }
+      // 학점 추정: 강좌목록 '시간' 칸의 주당 시수(쉼표로 나눈 개수)
+      const credits = {};
+      if (g.course) {
+        const hh = g.course.rows[0].map(S), iT = hh.indexOf('시간'), iS = hh.indexOf('과목분리');
+        if (iT >= 0 && iS >= 0) {
+          const votes = {};
+          g.course.rows.slice(1).forEach(r => { const sj = S(r[iS]), n = S(r[iT]).split(/[,，]/).filter(x => x.trim()).length; if (sj && n) { votes[sj] = votes[sj] || {}; votes[sj][n] = (votes[sj][n] || 0) + 1; } });
+          for (const sj in votes) credits[sj] = Number(Object.entries(votes[sj]).sort((a, b) => b[1] - a[1])[0][0]);
+        }
+      }
+      out.push({ grade: g.grade, total, maxP, cells, credits });
+    }
+    const md = d => Number(d.slice(0, 2)) * 100 + Number(d.slice(3, 5));
+    return { dates: [...dates].sort((a, b) => md(a) - md(b)), grades: out.sort((a, b) => a.grade - b.grade) };
+  }
+  const schedDateLabel = d => { const m = /^(\d{2})-(\d{2})\((.)\)$/.exec(d); return m ? `${Number(m[1])}/${Number(m[2])}[${m[3]}]` : d; };
+
+  async function buildScheduleWorkbook(ExcelJS, sd, opt) {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('시험 일정표', { pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 1, horizontalCentered: true, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } } });
+    const nD = sd.dates.length, lastCol = 3 + nD;
+    const fill = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+    const thin = { style: 'thin', color: { argb: 'FF000000' } }, med = { style: 'medium', color: { argb: 'FF000000' } };
+    ws.columns = [{ width: 5 }, { width: 4 }, { width: 17 }].concat(sd.dates.map(() => ({ width: Math.max(16, Math.round(80 / Math.max(nD, 1))) })));
+    ws.addRow([opt.title]); ws.mergeCells(1, 1, 1, lastCol);
+    const t = ws.getCell(1, 1); t.font = { bold: true, size: 20 }; t.alignment = { horizontal: 'center', vertical: 'middle' }; ws.getRow(1).height = 44;
+    ws.addRow([]);
+    const hr = ws.addRow(['학\n년', '교\n시', '고사 시간'].concat(sd.dates.map(schedDateLabel)));
+    hr.height = 34;
+    hr.eachCell(c => { c.fill = fill('FFFDE1E4'); c.font = { bold: true, size: 13 }; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; c.border = { top: med, bottom: med, left: thin, right: thin }; });
+    const gColor = { 1: 'FFFDE9A9', 2: 'FFCDEFFD', 3: 'FFD9D9D9' };
+    for (const g of sd.grades) {
+      const start = ws.rowCount + 1;
+      for (let p = 1; p <= g.maxP; p++) {
+        const tm = opt.times[p] || {};
+        const row = ws.addRow([g.grade, p, '']);
+        const tc = row.getCell(3);
+        tc.value = { richText: [{ text: `(예비령 ${tm.bell || ''})\n`, font: { color: { argb: 'FF1F5FD6' }, bold: true, size: 10 } }, { text: `${tm.start || ''}~${tm.end || ''}`, font: { bold: true, size: 12 } }] };
+        let lines = 1;
+        sd.dates.forEach((d, i) => {
+          const list = g.cells[d + '|' + p] || [];
+          const rt = [];
+          list.forEach((it, k) => {
+            const cr = opt.credit(g.grade, it.subject);
+            rt.push({ text: (k ? '\n' : '') + it.subject + (cr ? `(${cr})` : ''), font: { size: 11 } });
+            if (opt.showAll || it.count < g.total) rt.push({ text: `[${it.count}명]`, font: { size: 11, bold: true, color: { argb: 'FFE00000' } } });
+          });
+          const cell = row.getCell(4 + i);
+          cell.value = rt.length ? { richText: rt } : '';
+          lines = Math.max(lines, list.length);
+        });
+        row.height = Math.max(46, lines * 30);
+        row.eachCell({ includeEmpty: true }, (c, cn) => {
+          c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+          c.border = { top: p === 1 ? med : thin, bottom: p === g.maxP ? med : thin, left: cn === 4 ? med : thin, right: cn === lastCol ? med : thin };
+          if (cn <= 3) c.fill = fill(gColor[g.grade] || 'FFEFEFEF');
+        });
+        row.getCell(2).font = { bold: true, italic: true, size: 12 };
+      }
+      ws.mergeCells(start, 1, start + g.maxP - 1, 1);
+      const gc = ws.getCell(start, 1); gc.font = { bold: true, size: 20 }; gc.alignment = { horizontal: 'center', vertical: 'middle' };
+    }
+    ws.addRow([]);
+    opt.notes.forEach(n => { const r = ws.addRow(['※ ' + n]); ws.mergeCells(r.number, 1, r.number, lastCol); r.getCell(1).font = { bold: true, size: 11 }; });
+    return wb.xlsx.writeBuffer();
+  }
+
   // 결과 엑셀 (ExcelJS)
   async function buildWorkbook(ExcelJS, res) {
     const wb = new ExcelJS.Workbook();
@@ -949,7 +1144,7 @@
     return wb.xlsx.writeBuffer();
   }
 
-  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, timetableRecords, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook, buildStudentBook, studentCellText, studentTable, buildEnvelopeHwpx };
+  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, timetableRecords, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook, buildStudentBook, studentCellText, studentTable, buildEnvelopeHwpx, scheduleData, schedDateLabel, buildScheduleWorkbook, applySubjectMoves, checkSubjectMove, slotKey };
   if (typeof module !== 'undefined') module.exports = root.ExamCore;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -967,7 +1162,8 @@ let result = null;
 let waitPlaces = {};  // '학년|교시' 또는 '학년|교시|반' → 장소
 try { waitPlaces = JSON.parse(localStorage.getItem('examseat.waitPlaces') || '{}') || {}; } catch (e) { waitPlaces = {}; }
 const saveWaits = () => { try { localStorage.setItem('examseat.waitPlaces', JSON.stringify(waitPlaces)); } catch (e) {} };
-let overrides = [];   // 고사실 수동 변경 {period, subject, from, to}
+let overrides = [];
+let subjMoves = [];  // 과목 시험 시간 옮기기 {grade, subject, from, to}   // 고사실 수동 변경 {period, subject, from, to}
 let uid = 0;
 
 function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), ms); }
@@ -1116,12 +1312,16 @@ function run(keepView) {
     }
     grades.push(out);
   }
+  const mvReport = C.applySubjectMoves(grades, subjMoves);
+  mvReport.forEach((r, i) => { if (r.conflicts.length) warnings.push(`과목 옮기기 ${subjMoves[i].grade}학년 ${subjMoves[i].subject} → ${periodLabel(subjMoves[i].to)}: 그 시간에 다른 시험이 있는 ${r.conflicts.length}명은 옮기지 못했습니다 (${r.conflicts.slice(0, 3).join(', ')}${r.conflicts.length > 3 ? ' 등' : ''}).`); });
   const applied = C.applyRoomOverrides(grades, overrides);
   // 현황: 개인 시간표 기준(자기 반 교실 시험 포함). 시간표가 없으면 명렬표 기준
   const ttRecs = C.timetableRecords(grades);
   const summary = C.buildSummary(ttRecs.length ? ttRecs : grades.flatMap(g => g.roster ? g.roster.records : []));
   const tts = grades.filter(g => g.timetable).map(g => g.timetable);
-  const periods = [...new Set(tts.flatMap(t => t.dataCols.map(c => S(t.rows[0][c]))))].sort();
+  // 시험이 하나라도 있는 교시만 (과목을 옮겨 비게 된 교시는 뺌)
+  const hasExam = (t, c) => t.rows.some((r, i) => i > 0 && S(r[c]) && !S(r[c]).includes('미응시'));
+  const periods = [...new Set(tts.flatMap(t => t.dataCols.filter(c => hasExam(t, c)).map(c => S(t.rows[0][c]))))].sort((a, b) => C.slotKey(a) - C.slotKey(b));
   // 고사실 좌석 겹침 검사
   const conflicts = {};
   for (const p of periods) {
@@ -1131,7 +1331,7 @@ function run(keepView) {
       cf.forEach(c => warnings.push(`<b>${periodLabel(p)} ${roomLabel(c.room)}(${c.room})</b>: ` + Object.entries(c.subjects).map(([s, n]) => `${s} ${n}명`).join(' + ') + ` 이(가) 같은 고사실에 배정되어 좌석 ${c.dup}개가 겹칩니다. 강좌목록의 장소를 확인하세요.`));
     }
   }
-  result = { grades, summary, periods, tts, conflicts, warnings, overrides, applied, waitPlaces, waits: C.waitList(grades) };
+  result = { grades, summary, periods, tts, conflicts, warnings, overrides, applied, waitPlaces, waits: C.waitList(grades), mvReport };
   renderResult(keepView);
 }
 
@@ -1162,6 +1362,7 @@ function renderResult(keepView) {
   renderOverrides();
   renderWait();
   renderEnvTab(keepView);
+  renderSched();
   if (!keepView) $('#resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -1784,6 +1985,240 @@ $('#stuXlsx').addEventListener('click', async () => {
     busy(false);
     await saveFile('학생조회용_시간표.xlsx', new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
   } catch (e) { busy(false); toast('파일 오류: ' + e.message); }
+});
+
+// ---------- 일정표 ----------
+let schedCfg = { title: '', arrive: '07:40', showAll: false, times: {}, credits: {}, notes: '', logo: '', extraDates: [] };
+try { schedCfg = Object.assign(schedCfg, JSON.parse(localStorage.getItem('examseat.sched') || '{}')); } catch (e) {}
+const saveSched = () => { try { localStorage.setItem('examseat.sched', JSON.stringify(schedCfg)); } catch (e) { try { const c = Object.assign({}, schedCfg, { logo: '' }); localStorage.setItem('examseat.sched', JSON.stringify(c)); } catch (e2) {} } };
+const DEF_TIMES = { 1: ['08:20', '08:25', '09:15'], 2: ['09:35', '09:40', '10:30'], 3: ['10:50', '10:55', '11:45'], 4: ['12:05', '12:10', '13:00'], 5: ['13:55', '14:00', '14:50'] };
+if (!schedCfg.title) schedCfg.title = (envCfg.title || '').replace(/\{학년\}학년\s*/, '').trim() + ' 일정 및 시간표';
+if (!schedCfg.notes) schedCfg.notes = '각 학급별 시험 종료 후 청소 및 종례를 실시합니다.\n이동시험 관련 사항은 시험 시행과 더불어 일자별 안내 예정입니다.';
+const timeOf = p => { const d = DEF_TIMES[p] || ['', '', '']; const t = schedCfg.times[p] || {}; return { bell: t.bell ?? d[0], start: t.start ?? d[1], end: t.end ?? d[2] }; };
+$('#schedTitle').value = schedCfg.title; $('#schedArrive').value = schedCfg.arrive; $('#schedShowAll').checked = !!schedCfg.showAll; $('#schedNotes').value = schedCfg.notes;
+$('#schedTitle').addEventListener('input', e => { schedCfg.title = e.target.value; saveSched(); });
+$('#schedArrive').addEventListener('input', e => { schedCfg.arrive = e.target.value; saveSched(); });
+$('#schedNotes').addEventListener('input', e => { schedCfg.notes = e.target.value; saveSched(); });
+$('#schedShowAll').addEventListener('change', e => { schedCfg.showAll = e.target.checked; saveSched(); renderSched(); });
+$('#schedLogo').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader(); rd.onload = () => { schedCfg.logo = rd.result; saveSched(); toast('로고를 넣었습니다.'); }; rd.readAsDataURL(f);
+});
+$('#schedLogoDel').addEventListener('click', () => { schedCfg.logo = ''; saveSched(); $('#schedLogo').value = ''; toast('로고를 뺐습니다.'); });
+const creditOf = (g, subj, sd) => { const k = g + '|' + subj; if (schedCfg.credits[k] !== undefined) return schedCfg.credits[k]; const gg = sd && sd.grades.find(x => x.grade === g); return gg && gg.credits[subj] ? String(gg.credits[subj]) : ''; };
+const WD = '일월화수목금토';
+function schedSD() {
+  const sd = C.scheduleData(result.grades);
+  (schedCfg.extraDates || []).forEach(d => { if (!sd.dates.includes(d)) sd.dates.push(d); });
+  const md = d => Number(d.slice(0, 2)) * 100 + Number(d.slice(3, 5));
+  sd.dates.sort((a, b) => md(a) - md(b));
+  return sd;
+}
+let pickChip = null;
+function renderSched() {
+  if (!result) return;
+  const sd = schedSD(), tbl = $('#schedGrid');
+  const movedKey = new Set(subjMoves.map(m => m.grade + '|' + m.subject + '|' + m.to));
+  let html = '<thead><tr><th>학년</th><th>교시</th><th>고사 시간</th>' + sd.dates.map(d => `<th>${esc(C.schedDateLabel(d))}${(schedCfg.extraDates || []).includes(d) ? ` <button class="x" data-deldate="${esc(d)}" title="빈 날짜 열 빼기">×</button>` : ''}</th>`).join('') + '</tr></thead><tbody>';
+  for (const g of sd.grades) {
+    for (let p = 1; p <= g.maxP + 1; p++) {
+      const extra = p > g.maxP, tm = timeOf(p);
+      html += `<tr class="g${g.grade}${extra ? ' extra' : ''}">`;
+      if (p === 1) html += `<td class="g hd" rowspan="${g.maxP + 1}">${g.grade}</td>`;
+      html += `<td class="p hd">${extra ? '+' : p}</td><td class="tm hd">${extra ? '새 교시' : `<small>(예비령 ${esc(tm.bell)})</small>${esc(tm.start)}~${esc(tm.end)}`}</td>`;
+      for (const d of sd.dates) {
+        const list = g.cells[d + '|' + p] || [];
+        html += `<td class="slot" data-grade="${g.grade}" data-slot="${esc(d + p)}">` + list.map(it => {
+          const cr = creditOf(g.grade, it.subject, sd), showN = schedCfg.showAll || it.count < g.total;
+          return `<span class="chip2${movedKey.has(g.grade + '|' + it.subject + '|' + d + p) ? ' moved' : ''}" draggable="true" data-grade="${g.grade}" data-subject="${esc(it.subject)}" data-slot="${esc(d + p)}">${esc(it.subject)}${cr ? `(${esc(cr)})` : ''}${showN ? `<em>[${it.count}명]</em>` : ''}</span>`;
+        }).join('<br>') + '</td>';
+      }
+      html += '</tr>';
+    }
+  }
+  tbl.innerHTML = html + '</tbody>';
+  // 끌어다 놓기
+  tbl.querySelectorAll('.chip2').forEach(ch => {
+    ch.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', JSON.stringify({ grade: +ch.dataset.grade, subject: ch.dataset.subject, from: ch.dataset.slot })); e.dataTransfer.effectAllowed = 'move'; tbl.dataset.dragGrade = ch.dataset.grade; });
+    ch.addEventListener('dragend', () => { delete tbl.dataset.dragGrade; tbl.querySelectorAll('.over').forEach(x => x.classList.remove('over')); });
+    ch.addEventListener('click', e => {
+      e.stopPropagation();
+      // 이미 고른 과목이 있고 같은 학년의 다른 칸 과목을 누르면 → 그 칸으로 옮기기
+      if (pickChip && pickChip.dataset.grade === ch.dataset.grade && pickChip.dataset.slot !== ch.dataset.slot) { const c = pickChip; clearPick(); doSubjectMove(+c.dataset.grade, c.dataset.subject, c.dataset.slot, ch.dataset.slot); return; }
+      if (pickChip && pickChip.dataset.subject === ch.dataset.subject && pickChip.dataset.slot === ch.dataset.slot) { clearPick(); return; }
+      clearPick(); pickChip = ch; ch.classList.add('sel');
+      tbl.querySelectorAll(`td.slot[data-grade="${ch.dataset.grade}"]`).forEach(td => td.classList.add('pick'));
+      toast(`${ch.dataset.subject}: 옮길 칸을 누르세요 (취소: Esc)`);
+    });
+  });
+  tbl.querySelectorAll('td.slot').forEach(td => {
+    td.addEventListener('dragover', e => { if (tbl.dataset.dragGrade === td.dataset.grade) { e.preventDefault(); td.classList.add('over'); } });
+    td.addEventListener('dragleave', () => td.classList.remove('over'));
+    td.addEventListener('drop', e => { e.preventDefault(); td.classList.remove('over'); try { const d = JSON.parse(e.dataTransfer.getData('text/plain')); if (d.grade === +td.dataset.grade) doSubjectMove(d.grade, d.subject, d.from, td.dataset.slot); } catch (err) {} });
+    td.addEventListener('click', () => { if (pickChip && pickChip.dataset.grade === td.dataset.grade) { const c = pickChip; clearPick(); doSubjectMove(+c.dataset.grade, c.dataset.subject, c.dataset.slot, td.dataset.slot); } });
+  });
+  tbl.querySelectorAll('[data-deldate]').forEach(b => b.addEventListener('click', () => { schedCfg.extraDates = schedCfg.extraDates.filter(x => x !== b.dataset.deldate); saveSched(); renderSched(); }));
+  // 시간 칸
+  const maxP = Math.max(1, ...sd.grades.map(g => g.maxP));
+  $('#schedTimes').innerHTML = '<span></span><span class="muted">예비령</span><span class="muted">시작</span><span class="muted">끝</span>' + [...Array(maxP + 1).keys()].map(i => i + 1).map(p => { const t = timeOf(p); return `<b>${p}교시</b><input data-p="${p}" data-k="bell" value="${esc(t.bell)}"><input data-p="${p}" data-k="start" value="${esc(t.start)}"><input data-p="${p}" data-k="end" value="${esc(t.end)}">`; }).join('');
+  $('#schedTimes').querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => { const p = inp.dataset.p; schedCfg.times[p] = Object.assign(timeOf(p), { [inp.dataset.k]: inp.value.trim() }); saveSched(); renderSched(); }));
+  // 학점 표
+  const subs = []; sd.grades.forEach(g => { const seen = new Set(); Object.values(g.cells).flat().forEach(it => { if (!seen.has(it.subject)) { seen.add(it.subject); subs.push({ grade: g.grade, subject: it.subject }); } }); });
+  $('#schedCredits').innerHTML = '<thead><tr><th>학년</th><th>과목</th><th>학점</th></tr></thead><tbody>' + subs.map(x => `<tr><td>${x.grade}학년</td><td>${esc(x.subject)}</td><td><input type="text" class="sm" data-k="${esc(x.grade + '|' + x.subject)}" value="${esc(creditOf(x.grade, x.subject, sd))}" style="max-width:70px"></td></tr>`).join('') + '</tbody>';
+  $('#schedCredits').querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => { schedCfg.credits[inp.dataset.k] = inp.value.trim(); saveSched(); renderSched(); }));
+  renderMoves();
+}
+function clearPick() { if (pickChip) pickChip.classList.remove('sel'); pickChip = null; document.querySelectorAll('td.slot.pick').forEach(td => td.classList.remove('pick')); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') clearPick(); });
+$('#schedAddBtn').addEventListener('click', () => {
+  const v = $('#schedAddDate').value; if (!v) { toast('추가할 날짜를 고르세요.'); return; }
+  const dt = new Date(v + 'T00:00:00'), d = `${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}(${WD[dt.getDay()]})`;
+  schedCfg.extraDates = [...new Set([...(schedCfg.extraDates || []), d])]; saveSched(); renderSched();
+});
+function doSubjectMove(grade, subject, from, to) {
+  if (from === to) return;
+  const g = result.grades.find(x => x.grade === grade);
+  const chk = C.checkSubjectMove(g, { grade, subject, from, to });
+  if (chk.conflicts.length) { toast(`옮길 수 없습니다: ${periodLabel(to)}에 이미 다른 시험이 있는 학생 ${chk.conflicts.length}명 (${chk.conflicts.slice(0, 3).join(', ')}${chk.conflicts.length > 3 ? ' 등' : ''})`, 6000); return; }
+  // 같은 과목을 이미 옮겼다면 그 기록을 이어 붙임 (A→B 후 B→C 이면 A→C)
+  const prev = subjMoves.find(m => m.grade === grade && m.subject === subject && m.to === from);
+  if (prev) { prev.to = to; if (prev.to === prev.from) subjMoves = subjMoves.filter(m => m !== prev); }
+  else subjMoves.push({ grade, subject, from, to });
+  busy(true, '모두 다시 계산하는 중…');
+  setTimeout(() => { try { run(true); toast(`${grade}학년 ${subject} (${chk.students}명): ${periodLabel(from)} → ${periodLabel(to)} 으로 옮겼습니다.`); } catch (e) { console.error(e); toast('오류: ' + e.message, 5000); } busy(false); }, 30);
+}
+function renderMoves() {
+  const box = $('#mvList');
+  box.classList.toggle('hidden', !subjMoves.length);
+  if (!subjMoves.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="row"><b>과목 옮기기 내역 ${subjMoves.length}건</b><span class="muted" style="font-size:12.5px">개인 시간표·고사실 현황·좌석표·봉투·학생 조회에 모두 반영됨</span><span class="spacer"></span><button id="mvAll">모두 되돌리기</button></div><ul>` +
+    subjMoves.map((m, i) => `<li><span>${m.grade}학년 · ${esc(m.subject)} · <b>${esc(periodLabel(m.from))} → ${esc(periodLabel(m.to))}</b> <span class="muted">(${(result.mvReport && result.mvReport[i] ? result.mvReport[i].moved : 0)}명)</span></span><button data-i="${i}">되돌리기</button></li>`).join('') + '</ul>';
+  box.querySelectorAll('li button').forEach(b => b.addEventListener('click', () => { subjMoves.splice(+b.dataset.i, 1); recompute('과목 옮기기를 되돌렸습니다.'); }));
+  box.querySelector('#mvAll').addEventListener('click', () => { subjMoves = []; recompute('과목 옮기기를 모두 되돌렸습니다.'); });
+}
+// 일정표 그리기 (A4 세로, 200dpi)
+function schedNotes(sd) {
+  const regs = sd.grades.map(g => `${g.grade}학년 ${g.total}명`).join(', ');
+  const first = `등교 시각 ${schedCfg.arrive || ''}${regs ? `, 학년별 재적 현황 ${regs}` : ''}`;
+  return [first].concat((schedCfg.notes || '').split('\n').map(x => x.trim()).filter(Boolean));
+}
+async function drawSchedule() {
+  try { await document.fonts.load(`700 20px "Noto Sans KR"`); await document.fonts.load(`800 20px "Noto Sans KR"`); } catch (e) {}
+  const sd = schedSD(), k = mm => mm * 7.875, W = Math.round(k(210)), H = Math.round(k(297));
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+  const L = 15, R = 195, top0 = 14;
+  // 제목 + 로고
+  let titleY = top0 + 14;
+  if (schedCfg.logo) {
+    try { const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = schedCfg.logo; }); const hh = 22, ww = hh * img.width / img.height; x.drawImage(img, k(L + 2), k(top0 + 3), k(ww), k(hh)); } catch (e) {}
+  }
+  x.fillStyle = '#000'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  let fs = k(9.5); x.font = `800 ${fs}px ${FONT}`; while (fs > k(5) && x.measureText(schedCfg.title).width > k(schedCfg.logo ? 140 : 175)) { fs -= k(0.3); x.font = `800 ${fs}px ${FONT}`; }
+  x.fillText(schedCfg.title, k(schedCfg.logo ? 116 : 105), k(titleY));
+  // 표
+  const tTop = top0 + 30, colG = 9, colP = 7, colT = 33, nD = Math.max(1, sd.dates.length);
+  const dW = (R - L - colG - colP - colT) / nD, headH = 15;
+  const xs = [L, L + colG, L + colG + colP, L + colG + colP + colT]; for (let i = 1; i <= nD; i++) xs.push(xs[3] + dW * i);
+  // 칸 내용 줄 계산
+  let scale = 1;
+  const cellLines = (g, d, p, s) => {
+    const list = g.cells[d + '|' + p] || [], out = [];
+    x.font = `600 ${k(3.9 * s)}px ${FONT}`;
+    for (const it of list) {
+      const cr = creditOf(g.grade, it.subject, sd), name = it.subject + (cr ? `(${cr})` : ''), cnt = (schedCfg.showAll || it.count < g.total) ? `[${it.count}명]` : '';
+      const maxW = k(dW - 2.5), wN = x.measureText(name).width, wC = x.measureText(cnt).width;
+      // 조금 넘치는 정도면 글자를 줄여 한 줄로 두고(그릴 때 맞춤), 많이 길 때만 두 줄로 나눔
+      if (wN + wC <= maxW * 1.1) out.push([[name, '#000'], [cnt, '#e00000']]);
+      else if (wN <= maxW * 1.4) { out.push([[name, '#000']]); if (cnt) out.push([[cnt, '#e00000']]); }
+      else {   // 이름이 길면 가운데쯤에서 두 줄로 (원본 양식처럼 "역사로탐구하는 / 현대세계(3)")
+        const base = it.subject, cut = Math.ceil(base.length / 2);
+        const a = base.slice(0, cut), b = base.slice(cut) + (cr ? `(${cr})` : '');
+        out.push([[a, '#000']]);
+        if (x.measureText(b + cnt).width <= maxW) out.push([[b, '#000'], [cnt, '#e00000']]);
+        else { out.push([[b, '#000']]); if (cnt) out.push([[cnt, '#e00000']]); }
+      }
+    }
+    return out;
+  };
+  const layout = s => {
+    const rows = [];
+    for (const g of sd.grades) for (let p = 1; p <= g.maxP; p++) {
+      const n = Math.max(0, ...sd.dates.map(d => cellLines(g, d, p, s).length));
+      rows.push({ g, p, h: Math.max(26 * s, n * 5.6 * s + 6 * s) });
+    }
+    return rows;
+  };
+  let rows = layout(1);
+  const avail = 297 - 12 - tTop - headH - 8 * (1 + schedNotes(sd).length);
+  while (rows.reduce((a, r) => a + r.h, 0) > avail && scale > 0.55) { scale -= 0.05; rows = layout(scale); }
+  // 머리글
+  x.fillStyle = '#fde1e4'; x.fillRect(k(L), k(tTop), k(R - L), k(headH)); x.fillStyle = '#000';
+  x.font = `700 ${k(4.6)}px ${FONT}`;
+  const head = c => k((xs[c] + xs[c + 1]) / 2);
+  x.font = `700 ${k(4)}px ${FONT}`; x.fillText('학', head(0), k(tTop + 4.5)); x.fillText('년', head(0), k(tTop + 10.5)); x.fillText('교', head(1), k(tTop + 4.5)); x.fillText('시', head(1), k(tTop + 10.5));
+  x.font = `700 ${k(4.6)}px ${FONT}`; x.fillText('고사 시간', head(2), k(tTop + headH / 2));
+  sd.dates.forEach((d, i) => { x.font = `700 ${k(Math.min(5, dW * 0.16))}px ${FONT}`; x.fillText(C.schedDateLabel(d), head(3 + i), k(tTop + headH / 2)); });
+  // 본문
+  const gColor = { 1: '#fde9a9', 2: '#cdeffd', 3: '#d9d9d9' };
+  let y = tTop + headH;
+  const line = (x1, y1, x2, y2, w) => { x.lineWidth = k(w); x.beginPath(); x.moveTo(k(x1), k(y1)); x.lineTo(k(x2), k(y2)); x.stroke(); };
+  x.strokeStyle = '#000';
+  for (const g of sd.grades) {
+    const gr = rows.filter(r => r.g === g), gh = gr.reduce((a, r) => a + r.h, 0);
+    x.fillStyle = gColor[g.grade] || '#eee'; x.fillRect(k(xs[0]), k(y), k(xs[3] - xs[0]), k(gh));
+    x.fillStyle = '#000'; x.font = `800 ${k(8)}px ${FONT}`; x.fillText(String(g.grade), head(0), k(y + gh / 2));
+    let yy = y;
+    for (const r of gr) {
+      const tm = timeOf(r.p);
+      x.fillStyle = '#000'; x.font = `italic 700 ${k(5)}px ${FONT}`; x.fillText(String(r.p), head(1), k(yy + r.h / 2));
+      x.fillStyle = '#1f5fd6'; x.font = `700 ${k(3.6 * Math.max(scale, .8))}px ${FONT}`; x.fillText(`(예비령 ${tm.bell})`, head(2), k(yy + r.h / 2 - 3.6));
+      x.fillStyle = '#000'; x.font = `800 ${k(4.9 * Math.max(scale, .8))}px ${FONT}`; x.fillText(`${tm.start}~${tm.end}`, head(2), k(yy + r.h / 2 + 3));
+      sd.dates.forEach((d, i) => {
+        const ls = cellLines(g, d, r.p, scale), lh = 5.6 * scale, y0 = yy + r.h / 2 - (ls.length - 1) * lh / 2;
+        ls.forEach((segs, j) => {
+          // 칸 너비를 넘는 줄은 글자를 줄여서 맞춤
+          let fsz = k(3.9 * scale);
+          const width = f => segs.reduce((a, [t, col]) => { x.font = `${col === '#000' ? 600 : 800} ${f}px ${FONT}`; return a + x.measureText(t).width; }, 0);
+          const maxW = k(dW - 2);
+          let tw = width(fsz);
+          if (tw > maxW) { fsz = fsz * maxW / tw; tw = width(fsz); }
+          let cx = head(3 + i) - tw / 2;
+          x.textAlign = 'left';
+          segs.forEach(([t, col]) => { x.fillStyle = col; x.font = `${col === '#000' ? 600 : 800} ${fsz}px ${FONT}`; x.fillText(t, cx, k(y0 + j * lh)); cx += x.measureText(t).width; });
+          x.textAlign = 'center';
+        });
+      });
+      line(xs[1], yy + r.h, R, yy + r.h, 0.25);
+      yy += r.h;
+    }
+    line(L, y, R, y, 0.6);
+    y += gh;
+  }
+  line(L, y, R, y, 0.6);
+  // 세로선
+  xs.forEach((xx, i) => line(xx, tTop, xx, y, i === 0 || i === xs.length - 1 || i === 3 ? 0.6 : 0.25));
+  line(L, tTop, R, tTop, 0.6); line(L, tTop + headH, R, tTop + headH, 0.6);
+  // 안내 문구
+  x.textAlign = 'left'; x.fillStyle = '#000';
+  schedNotes(sd).forEach((n, i) => { x.font = `700 ${k(3.7)}px ${FONT}`; x.fillText('※ ' + n, k(L), k(y + 7 + i * 6.2), k(R - L)); });
+  return cv;
+}
+$('#schedPng').addEventListener('click', async () => { if (!result) return; const cv = await drawSchedule(); cv.toBlob(b => saveFile(`${fileSafe(schedCfg.title || '시험 일정표')}.png`, b)); });
+$('#schedPdf').addEventListener('click', async () => {
+  if (!result) return;
+  busy(true, '일정표 PDF 만드는 중…');
+  try { const cv = await drawSchedule(); const { jsPDF } = window.jspdf, pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }); pdf.addImage(cv, 'PNG', 0, 0, 210, 297, undefined, 'FAST'); busy(false); await saveFile(`${fileSafe(schedCfg.title || '시험 일정표')}.pdf`, pdf.output('blob')); }
+  catch (e) { busy(false); toast('PDF 오류: ' + e.message); }
+});
+$('#schedXlsx').addEventListener('click', async () => {
+  if (!result) return;
+  busy(true, '엑셀 만드는 중…');
+  try {
+    const sd = schedSD(), times = {}; for (let p = 1; p <= 8; p++) times[p] = timeOf(p);
+    const buf = await C.buildScheduleWorkbook(ExcelJS, sd, { title: schedCfg.title, times, showAll: schedCfg.showAll, credit: (g, s) => creditOf(g, s, sd), notes: schedNotes(sd) });
+    busy(false); await saveFile(`${fileSafe(schedCfg.title || '시험 일정표')}.xlsx`, new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  } catch (e) { busy(false); toast('엑셀 오류: ' + e.message); }
 });
 
 // ---------- 고사실 현황 ----------
