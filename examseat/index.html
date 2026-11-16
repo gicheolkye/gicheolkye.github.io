@@ -944,8 +944,14 @@
   function ensureSlot(t, slot) {
     const h = t.rows[0].map(S);
     if (h.includes(slot)) return;
+    const first = t.dataCols.length ? Math.min(...t.dataCols) : t.rows[0].length;
     t.rows.forEach((row, r) => row.push(r === 0 ? slot : '*미응시'));
-    const first = t.dataCols.length ? Math.min(...t.dataCols) : t.rows[0].length - 1;
+    if (!t.dataCols.length) t.dataCols = [first];
+    resortCols(t);
+  }
+  // 열을 날짜·교시 순으로 다시 정렬
+  function resortCols(t) {
+    const first = t.dataCols.length ? Math.min(...t.dataCols) : t.rows[0].length;
     const fixed = [...Array(first).keys()];
     const data = [...Array(t.rows[0].length - first).keys()].map(i => i + first).filter(i => S(t.rows[0][i]));
     data.sort((a, b) => slotKey(t.rows[0][a]) - slotKey(t.rows[0][b]));
@@ -953,6 +959,27 @@
     t.rows = t.rows.map(row => order.map(i => row[i] === undefined ? '' : row[i]));
     t.dataCols = data.map((_, k) => first + k);
   }
+  // 시험 날짜 바꾸기: map = { '11-16(월)': '11-23(월)', ... } (모든 학년에 적용)
+  function applyDateMap(grades, map) {
+    const keys = Object.keys(map || {}).filter(k => map[k] && map[k] !== k);
+    if (!keys.length) return;
+    for (const g of grades) {
+      const t = g.timetable; if (!t) continue;
+      let changed = false;
+      t.rows[0] = t.rows[0].map(v => { const m = /^(\d{2}-\d{2}\(.\))(\s*\d+)$/.exec(S(v)); if (m && map[m[1]]) { changed = true; return map[m[1]] + m[2].trim(); } return v; });
+      if (!changed) continue;
+      for (let r = 1; r < t.rows.length; r++) for (const c of t.dataCols) {
+        const v = S(t.rows[r][c]); if (!v || v.includes('미응시')) continue;
+        const L = v.split('\n'); if (L.length < 2) continue;
+        const m = /^(\d{2}-\d{2}\(.\))(.*)$/.exec(L[1].trim());
+        if (m && map[m[1]]) { L[1] = map[m[1]] + m[2]; t.rows[r][c] = L.join('\n'); }
+      }
+      resortCols(t);
+      t.highlights = computeHighlights(t.rows, t.dataCols);
+      if (g.roster) g.roster.records.forEach(rec => { const k = keys.find(k => k.slice(0, 5) === rec.date); if (k) rec.date = map[k].slice(0, 5); });
+    }
+  }
+
   function applySubjectMoves(grades, moves) {
     const report = moves.map(() => ({ moved: 0, conflicts: [] }));
     moves.forEach((mv, i) => {
@@ -1144,7 +1171,7 @@
     return wb.xlsx.writeBuffer();
   }
 
-  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, timetableRecords, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook, buildStudentBook, studentCellText, studentTable, buildEnvelopeHwpx, scheduleData, schedDateLabel, buildScheduleWorkbook, applySubjectMoves, checkSubjectMove, slotKey };
+  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, timetableRecords, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook, buildStudentBook, studentCellText, studentTable, buildEnvelopeHwpx, scheduleData, schedDateLabel, buildScheduleWorkbook, applySubjectMoves, checkSubjectMove, slotKey, applyDateMap };
   if (typeof module !== 'undefined') module.exports = root.ExamCore;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1163,6 +1190,7 @@ let waitPlaces = {};  // '학년|교시' 또는 '학년|교시|반' → 장소
 try { waitPlaces = JSON.parse(localStorage.getItem('examseat.waitPlaces') || '{}') || {}; } catch (e) { waitPlaces = {}; }
 const saveWaits = () => { try { localStorage.setItem('examseat.waitPlaces', JSON.stringify(waitPlaces)); } catch (e) {} };
 let overrides = [];
+let dateMap = {};    // 시험 날짜 바꾸기 {원래 'MM-DD(요)': 새 'MM-DD(요)'}
 let subjMoves = [];  // 과목 시험 시간 옮기기 {grade, subject, from, to}   // 고사실 수동 변경 {period, subject, from, to}
 let uid = 0;
 
@@ -1312,6 +1340,7 @@ function run(keepView) {
     }
     grades.push(out);
   }
+  C.applyDateMap(grades, dateMap);
   const mvReport = C.applySubjectMoves(grades, subjMoves);
   mvReport.forEach((r, i) => { if (r.conflicts.length) warnings.push(`과목 옮기기 ${subjMoves[i].grade}학년 ${subjMoves[i].subject} → ${periodLabel(subjMoves[i].to)}: 그 시간에 다른 시험이 있는 ${r.conflicts.length}명은 옮기지 못했습니다 (${r.conflicts.slice(0, 3).join(', ')}${r.conflicts.length > 3 ? ' 등' : ''}).`); });
   const applied = C.applyRoomOverrides(grades, overrides);
@@ -2019,7 +2048,8 @@ function renderSched() {
   if (!result) return;
   const sd = schedSD(), tbl = $('#schedGrid');
   const movedKey = new Set(subjMoves.map(m => m.grade + '|' + m.subject + '|' + m.to));
-  let html = '<thead><tr><th>학년</th><th>교시</th><th>고사 시간</th>' + sd.dates.map(d => `<th>${esc(C.schedDateLabel(d))}${(schedCfg.extraDates || []).includes(d) ? ` <button class="x" data-deldate="${esc(d)}" title="빈 날짜 열 빼기">×</button>` : ''}</th>`).join('') + '</tr></thead><tbody>';
+  const origOf = d => Object.keys(dateMap).find(k => dateMap[k] === d);
+  let html = '<thead><tr><th>학년</th><th>교시</th><th>고사 시간</th>' + sd.dates.map(d => { const o = origOf(d); return `<th${o ? ' style="background:#fff2e6"' : ''}>${esc(C.schedDateLabel(d))} <button class="x" data-editdate="${esc(d)}" title="날짜 바꾸기" style="font-size:13px;padding:0 3px">✎</button>${(schedCfg.extraDates || []).includes(d) ? ` <button class="x" data-deldate="${esc(d)}" title="빈 날짜 열 빼기">×</button>` : ''}${o ? `<div style="font-size:11px;font-weight:400;color:#a4461d">원래 ${esc(C.schedDateLabel(o))}</div>` : ''}</th>`; }).join('') + '</tr></thead><tbody>';
   for (const g of sd.grades) {
     for (let p = 1; p <= g.maxP + 1; p++) {
       const extra = p > g.maxP, tm = timeOf(p);
@@ -2057,6 +2087,7 @@ function renderSched() {
     td.addEventListener('drop', e => { e.preventDefault(); td.classList.remove('over'); try { const d = JSON.parse(e.dataTransfer.getData('text/plain')); if (d.grade === +td.dataset.grade) doSubjectMove(d.grade, d.subject, d.from, td.dataset.slot); } catch (err) {} });
     td.addEventListener('click', () => { if (pickChip && pickChip.dataset.grade === td.dataset.grade) { const c = pickChip; clearPick(); doSubjectMove(+c.dataset.grade, c.dataset.subject, c.dataset.slot, td.dataset.slot); } });
   });
+  tbl.querySelectorAll('[data-editdate]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); openDateEditor(b); }));
   tbl.querySelectorAll('[data-deldate]').forEach(b => b.addEventListener('click', () => { schedCfg.extraDates = schedCfg.extraDates.filter(x => x !== b.dataset.deldate); saveSched(); renderSched(); }));
   // 시간 칸
   const maxP = Math.max(1, ...sd.grades.map(g => g.maxP));
@@ -2068,6 +2099,38 @@ function renderSched() {
   $('#schedCredits').querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => { schedCfg.credits[inp.dataset.k] = inp.value.trim(); saveSched(); renderSched(); }));
   renderMoves();
 }
+// ---------- 날짜 바꾸기 ----------
+function toDateKey(v) { const dt = new Date(v + 'T00:00:00'); return `${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}(${WD[dt.getDay()]})`; }
+function isoOf(d) {   // 'MM-DD(요)' → 'YYYY-MM-DD' (연도는 올해, 요일이 맞는 쪽으로)
+  const m = Number(d.slice(0, 2)), day = Number(d.slice(3, 5)), y0 = new Date().getFullYear();
+  for (const y of [y0, y0 + 1, y0 - 1]) { const dt = new Date(y, m - 1, day); if (WD[dt.getDay()] === d[6]) return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`; }
+  return `${y0}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+function openDateEditor(btn) {
+  const cur = btn.dataset.editdate, th = btn.closest('th');
+  if (th.querySelector('input[type=date]')) return;
+  const inp = Object.assign(document.createElement('input'), { type: 'date', value: isoOf(cur) });
+  inp.style.cssText = 'display:block;margin:4px auto 0;font:inherit;font-size:12.5px;padding:2px 4px;border:1px solid var(--accent);border-radius:5px';
+  th.appendChild(inp); inp.focus(); try { inp.showPicker && inp.showPicker(); } catch (e) {}
+  inp.addEventListener('change', () => { if (inp.value) changeDate(cur, toDateKey(inp.value)); });
+  inp.addEventListener('blur', () => setTimeout(() => inp.remove(), 200));
+}
+function changeDate(cur, nd) {
+  if (!nd || nd === cur) return;
+  const sd = schedSD();
+  if (sd.dates.includes(nd)) { toast(`${C.schedDateLabel(nd)}에는 이미 시험이 있어 날짜를 합칠 수 없습니다. 과목을 끌어다 옮겨 주세요.`, 5000); return; }
+  // 원래 날짜 기준으로 기록 (11/16→11/23→11/24 이면 11/16→11/24)
+  const orig = Object.keys(dateMap).find(k => dateMap[k] === cur) || cur;
+  if (orig === nd) delete dateMap[orig]; else dateMap[orig] = nd;
+  // 이미 저장해 둔 교시 이름(과목 옮기기·고사실 바꾸기·대기 장소)도 새 날짜로
+  const swap = v => (typeof v === 'string' && v.startsWith(cur)) ? nd + v.slice(cur.length) : v;
+  subjMoves.forEach(m => { m.from = swap(m.from); m.to = swap(m.to); });
+  overrides.forEach(o => { o.period = swap(o.period); });
+  const nw = {}; for (const [k, v] of Object.entries(waitPlaces)) { const p = k.split('|'); if (p[1]) p[1] = swap(p[1]); nw[p.join('|')] = v; } waitPlaces = nw; saveWaits();
+  schedCfg.extraDates = (schedCfg.extraDates || []).map(d => d === cur ? nd : d); saveSched();
+  recompute(`${C.schedDateLabel(cur)} 시험을 ${C.schedDateLabel(nd)}로 옮겼습니다.`);
+}
+
 function clearPick() { if (pickChip) pickChip.classList.remove('sel'); pickChip = null; document.querySelectorAll('td.slot.pick').forEach(td => td.classList.remove('pick')); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') clearPick(); });
 $('#schedAddBtn').addEventListener('click', () => {
@@ -2089,12 +2152,14 @@ function doSubjectMove(grade, subject, from, to) {
 }
 function renderMoves() {
   const box = $('#mvList');
-  box.classList.toggle('hidden', !subjMoves.length);
-  if (!subjMoves.length) { box.innerHTML = ''; return; }
-  box.innerHTML = `<div class="row"><b>과목 옮기기 내역 ${subjMoves.length}건</b><span class="muted" style="font-size:12.5px">개인 시간표·고사실 현황·좌석표·봉투·학생 조회에 모두 반영됨</span><span class="spacer"></span><button id="mvAll">모두 되돌리기</button></div><ul>` +
-    subjMoves.map((m, i) => `<li><span>${m.grade}학년 · ${esc(m.subject)} · <b>${esc(periodLabel(m.from))} → ${esc(periodLabel(m.to))}</b> <span class="muted">(${(result.mvReport && result.mvReport[i] ? result.mvReport[i].moved : 0)}명)</span></span><button data-i="${i}">되돌리기</button></li>`).join('') + '</ul>';
-  box.querySelectorAll('li button').forEach(b => b.addEventListener('click', () => { subjMoves.splice(+b.dataset.i, 1); recompute('과목 옮기기를 되돌렸습니다.'); }));
-  box.querySelector('#mvAll').addEventListener('click', () => { subjMoves = []; recompute('과목 옮기기를 모두 되돌렸습니다.'); });
+  const dEntries = Object.entries(dateMap);
+  box.classList.toggle('hidden', !subjMoves.length && !dEntries.length);
+  if (!subjMoves.length && !dEntries.length) { box.innerHTML = ''; return; }
+  box.innerHTML = (dEntries.length ? `<div class="row"><b>날짜 바꾸기 ${dEntries.length}건</b></div><ul style="margin-bottom:8px">` + dEntries.map(([o, n]) => `<li><span><b>${esc(C.schedDateLabel(o))} → ${esc(C.schedDateLabel(n))}</b> <span class="muted">(모든 학년)</span></span><button data-dundo="${esc(o)}">되돌리기</button></li>`).join('') + '</ul>' : '') + (!subjMoves.length ? '' : `<div class="row"><b>과목 옮기기 내역 ${subjMoves.length}건</b><span class="muted" style="font-size:12.5px">개인 시간표·고사실 현황·좌석표·봉투·학생 조회에 모두 반영됨</span><span class="spacer"></span><button id="mvAll">모두 되돌리기</button></div><ul>` +
+    subjMoves.map((m, i) => `<li><span>${m.grade}학년 · ${esc(m.subject)} · <b>${esc(periodLabel(m.from))} → ${esc(periodLabel(m.to))}</b> <span class="muted">(${(result.mvReport && result.mvReport[i] ? result.mvReport[i].moved : 0)}명)</span></span><button data-i="${i}">되돌리기</button></li>`).join('') + '</ul>');
+  box.querySelectorAll('li button[data-i]').forEach(b => b.addEventListener('click', () => { subjMoves.splice(+b.dataset.i, 1); recompute('과목 옮기기를 되돌렸습니다.'); }));
+  box.querySelectorAll('li button[data-dundo]').forEach(b => b.addEventListener('click', () => { const o = b.dataset.dundo; changeDate(dateMap[o], o); }));
+  const all = box.querySelector('#mvAll'); if (all) all.addEventListener('click', () => { subjMoves = []; recompute('과목 옮기기를 모두 되돌렸습니다.'); });
 }
 // 일정표 그리기 (A4 세로, 200dpi)
 function schedNotes(sd) {
