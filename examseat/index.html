@@ -565,6 +565,9 @@
 <script>
 (() => {
 const C = window.ExamCore, S = C.S;
+// 표시용 이름: "11-16(월)1" → "11-16(월) 1교시", "208" → "2학년 8반"
+const periodLabel = p => String(p).replace(/^(.*\))\s*(\d+)$/, '$1 $2교시');
+const roomLabel = r => /^[1-3]\d{2}$/.test(r) ? `${r[0]}학년 ${parseInt(r.slice(1), 10)}반` : r;
 const $ = s => document.querySelector(s);
 const KIND = { course: '강좌목록', roster: '고사실별 명렬표', timetable: '개인 시간표' };
 let files = [];      // {id,name,rows,kind,grade,info}
@@ -729,7 +732,7 @@ function run(keepView) {
     const cf = C.seatConflicts(C.seatData(tts, p));
     if (cf.length) {
       conflicts[p] = cf;
-      cf.forEach(c => warnings.push(`<b>${p} ${c.room}</b>: ` + Object.entries(c.subjects).map(([s, n]) => `${s} ${n}명`).join(' + ') + ` 이(가) 같은 고사실에 배정되어 좌석 ${c.dup}개가 겹칩니다. 강좌목록의 장소를 확인하세요.`));
+      cf.forEach(c => warnings.push(`<b>${periodLabel(p)} ${roomLabel(c.room)}(${c.room})</b>: ` + Object.entries(c.subjects).map(([s, n]) => `${s} ${n}명`).join(' + ') + ` 이(가) 같은 고사실에 배정되어 좌석 ${c.dup}개가 겹칩니다. 강좌목록의 장소를 확인하세요.`));
     }
   }
   result = { grades, summary, periods, tts, conflicts, warnings, overrides, applied };
@@ -755,7 +758,7 @@ function renderResult(keepView) {
   if (keepView && prevGrade) sel.value = prevGrade;
   renderTT();
   renderSummary();
-  $('#seatPeriod').innerHTML = R.periods.map(p => `<option value="${p}" ${R.conflicts[p] ? 'style="color:#a4461d"' : ''}>${p}${R.conflicts[p] ? ' ⚠' : ''}</option>`).join('');
+  $('#seatPeriod').innerHTML = R.periods.map(p => `<option value="${p}" ${R.conflicts[p] ? 'style="color:#a4461d"' : ''}>${periodLabel(p)}${R.conflicts[p] ? ' ⚠' : ''}</option>`).join('');
   if (keepView && R.periods.includes(prevPeriod)) $('#seatPeriod').value = prevPeriod;
   seatCache.clear();
   renderSeats();
@@ -833,7 +836,7 @@ function drawRoom(period, room, list) {
   x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
   const subjects = [...new Set(list.map(s => s.subject))];
   x.fillStyle = '#111'; x.textAlign = 'center'; x.textBaseline = 'alphabetic';
-  x.font = `700 40px ${FONT}`; x.fillText(`[${period}] ${room}`, W / 2, 62);
+  x.font = `700 40px ${FONT}`; x.fillText(`${periodLabel(period)} ${roomLabel(room)}`, W / 2, 62);
   x.font = `500 26px ${FONT}`; x.fillText('과목: ' + subjects.join(' / ') + `   (${list.length}명)`, W / 2, 104, W - 2 * pad);
   // 교탁
   const tw = 220, th = 46, tx = W / 2 - tw / 2, ty = 130;
@@ -889,8 +892,8 @@ async function renderSeats() {
     d.appendChild(it.canvas);
     const subj = [...new Set(it.list.map(s => s.subject))].join(', ');
     const movable = !/학년/.test(it.room);
-    d.insertAdjacentHTML('beforeend', `<div class="row"><b>${esc(it.room)}</b><span class="meta">${esc(subj)} · ${it.list.length}명</span>${bad.has(it.room) ? '<span class="bad-t">좌석 겹침</span>' : ''}<span class="spacer"></span>${movable ? '<button class="small mvBtn">고사실 바꾸기</button>' : ''}<button class="small pngBtn">PNG</button></div>`);
-    d.querySelector('.pngBtn').addEventListener('click', () => it.canvas.toBlob(b => saveFile(`${p}_${it.room}.png`, b)));
+    d.insertAdjacentHTML('beforeend', `<div class="row"><b>${esc(roomLabel(it.room))}</b>${roomLabel(it.room) !== it.room ? `<span class="meta">(${esc(it.room)})</span>` : ''}<span class="meta">${esc(subj)} · ${it.list.length}명</span>${bad.has(it.room) ? '<span class="bad-t">좌석 겹침</span>' : ''}<span class="spacer"></span>${movable ? '<button class="small mvBtn">고사실 바꾸기</button>' : ''}<button class="small pngBtn">PNG</button></div>`);
+    d.querySelector('.pngBtn').addEventListener('click', () => it.canvas.toBlob(b => saveFile(`${periodLabel(p)} ${roomLabel(it.room)}.png`, b)));
     if (movable) {
       d.querySelector('.mvBtn').addEventListener('click', () => toggleMovePanel(d, p, it, items));
       if (bad.has(it.room)) toggleMovePanel(d, p, it, items);
@@ -981,10 +984,10 @@ $('#seatZip').addEventListener('click', async () => {
   const p = $('#seatPeriod').value.replace(' ⚠', ''); if (!p) return;
   busy(true, 'PNG 묶는 중…');
   try {
-    const zip = new JSZip(); const folder = zip.folder('배치표_' + fileSafe(p));
-    for (const it of periodCanvases(p)) folder.file(fileSafe(it.room) + '.png', await canvasBlob(it.canvas));
+    const zip = new JSZip(); const folder = zip.folder('좌석표_' + fileSafe(periodLabel(p)));
+    for (const it of periodCanvases(p)) folder.file(fileSafe(`${periodLabel(p)} ${roomLabel(it.room)}`) + '.png', await canvasBlob(it.canvas));
     const blob = await zip.generateAsync({ type: 'blob' });
-    busy(false); await saveFile(`좌석표_${fileSafe(p)}.zip`, blob);
+    busy(false); await saveFile(`좌석표_${fileSafe(periodLabel(p))}.zip`, blob);
   } catch (e) { busy(false); toast('ZIP을 만들지 못했습니다: ' + e.message); }
 });
 
@@ -1008,7 +1011,7 @@ async function makePdf(periodList, name) {
 $('#seatPdf').addEventListener('click', async () => {
   const p = $('#seatPeriod').value.replace(' ⚠', ''); if (!p) return;
   busy(true, 'PDF 만드는 중…');
-  try { await document.fonts.load(`700 20px "Noto Sans KR"`); const run = makePdf([p], `좌석표_${fileSafe(p)}.pdf`); busy(false); await run; } catch (e) { busy(false); toast('PDF 오류: ' + e.message); }
+  try { await document.fonts.load(`700 20px "Noto Sans KR"`); const run = makePdf([p], `좌석표_${fileSafe(periodLabel(p))}.pdf`); busy(false); await run; } catch (e) { busy(false); toast('PDF 오류: ' + e.message); }
 });
 $('#seatAllPdf').addEventListener('click', async () => {
   busy(true, '전체 교시 PDF 만드는 중…');
