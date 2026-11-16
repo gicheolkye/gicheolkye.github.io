@@ -141,7 +141,7 @@
   .chip2.sel{outline:2px solid var(--accent);background:var(--accent-soft)}
   .chip2.moved{border-color:#e7a37f;background:#fff7f2}
   .chip2 em{font-style:normal;color:#e00000;font-weight:700}
-  .timeGrid{display:grid;grid-template-columns:auto repeat(3,auto);gap:4px 8px;align-items:center;font-size:13px}
+  .timeGrid{display:grid;grid-template-columns:auto auto auto 1fr;gap:4px 8px;align-items:center;font-size:13px}
   .timeGrid input{width:74px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px}
   .envs{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-top:14px}
   .envs .room canvas{border:1px solid var(--line)}
@@ -315,7 +315,8 @@
           <label>학교 로고</label><div class="row"><input type="file" id="schedLogo" accept="image/*" style="font-size:12.5px"><button class="small" id="schedLogoDel">로고 빼기</button><span class="muted" style="font-size:12px">제목 왼쪽에 들어갑니다(선택). 이 브라우저에 기억됩니다.</span></div>
           <label for="schedArrive">등교 시각</label><input type="text" id="schedArrive" style="max-width:120px">
           <label>인원 표시</label><label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" id="schedShowAll" style="width:auto"> 학년 전체가 보는 과목도 [명] 표시</label>
-          <label>교시별 시간</label><div class="timeGrid" id="schedTimes"></div>
+          <label>시험 시간</label><div class="row" style="gap:8px;font-size:13px">기본 <input type="number" id="schedDur" min="10" max="180" style="width:70px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px">분 · 예비령은 시작 <input type="number" id="schedBell" min="0" max="30" style="width:60px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px">분 전</div>
+          <label>교시별 시간</label><div><div class="timeGrid" id="schedTimes"></div><div class="muted" style="font-size:12px;margin-top:4px">시험 시간을 비우면 기본 시험 시간을 씁니다. 교시 수는 위 표의 학년 칸 <b>−/+</b>로 바꿉니다.</div></div>
           <label for="schedNotes">안내 문구</label><div><textarea id="schedNotes" rows="3" style="width:100%;max-width:620px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid #cfd3cf;border-radius:6px"></textarea><div class="muted" style="font-size:12px">한 줄에 하나씩. 맨 앞에 “등교 시각·학년별 재적 현황” 줄은 자동으로 들어갑니다.</div></div>
         </div>
         <div style="margin-top:8px"><b style="font-size:13.5px">과목 학점</b> <span class="muted" style="font-size:12.5px">이동수업 과목은 강좌목록의 주당 시수로 미리 채웠습니다. 비우면 (학점) 없이 나옵니다.</span></div>
@@ -1050,7 +1051,8 @@
           for (const sj in votes) credits[sj] = Number(Object.entries(votes[sj]).sort((a, b) => b[1] - a[1])[0][0]);
         }
       }
-      out.push({ grade: g.grade, total, maxP, cells, credits });
+      let maxExamP = 0; for (const k in cells) if (cells[k].length) maxExamP = Math.max(maxExamP, Number(k.split('|')[1]));
+      out.push({ grade: g.grade, total, maxP, maxExamP, cells, credits });
     }
     const md = d => Number(d.slice(0, 2)) * 100 + Number(d.slice(3, 5));
     return { dates: [...dates].sort((a, b) => md(a) - md(b)), grades: out.sort((a, b) => a.grade - b.grade) };
@@ -2017,17 +2019,33 @@ $('#stuXlsx').addEventListener('click', async () => {
 });
 
 // ---------- 일정표 ----------
-let schedCfg = { title: '', arrive: '07:40', showAll: false, times: {}, credits: {}, notes: '', logo: '', extraDates: [] };
+let schedCfg = { title: '', arrive: '07:40', showAll: false, times: {}, credits: {}, notes: '', logo: '', extraDates: [], dur: 50, bellBefore: 5, gradePeriods: {} };
 try { schedCfg = Object.assign(schedCfg, JSON.parse(localStorage.getItem('examseat.sched') || '{}')); } catch (e) {}
 const saveSched = () => { try { localStorage.setItem('examseat.sched', JSON.stringify(schedCfg)); } catch (e) { try { const c = Object.assign({}, schedCfg, { logo: '' }); localStorage.setItem('examseat.sched', JSON.stringify(c)); } catch (e2) {} } };
-const DEF_TIMES = { 1: ['08:20', '08:25', '09:15'], 2: ['09:35', '09:40', '10:30'], 3: ['10:50', '10:55', '11:45'], 4: ['12:05', '12:10', '13:00'], 5: ['13:55', '14:00', '14:50'] };
+const DEF_START = { 1: '08:25', 2: '09:40', 3: '10:55', 4: '12:10', 5: '14:00', 6: '15:05', 7: '16:10' };
+const toMin = t => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '').trim()); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+const toHM = m => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
 if (!schedCfg.title) schedCfg.title = (envCfg.title || '').replace(/\{학년\}학년\s*/, '').trim() + ' 일정 및 시간표';
 if (!schedCfg.notes) schedCfg.notes = '각 학급별 시험 종료 후 청소 및 종례를 실시합니다.\n이동시험 관련 사항은 시험 시행과 더불어 일자별 안내 예정입니다.';
-const timeOf = p => { const d = DEF_TIMES[p] || ['', '', '']; const t = schedCfg.times[p] || {}; return { bell: t.bell ?? d[0], start: t.start ?? d[1], end: t.end ?? d[2] }; };
+// 교시 시간: 시작(교시별) + 시험 시간(교시별, 비우면 기본) → 끝, 예비령 = 시작 − n분
+function timeOf(p) {
+  const t = schedCfg.times[p] || {};
+  let start = t.start;
+  if (!start) {   // 기본 시작: 앞 교시 끝 + 25분(쉬는 시간) 또는 기본표
+    const prev = p > 1 ? timeOf(p - 1) : null;
+    start = DEF_START[p] || (prev && toMin(prev.end) !== null ? toHM(toMin(prev.end) + 25) : '');
+  }
+  const dur = Number(t.dur) || Number(schedCfg.dur) || 50, bb = Number(schedCfg.bellBefore ?? 5);
+  const sm = toMin(start);
+  return { start, dur, durCustom: !!Number(t.dur), bell: sm === null ? '' : toHM(sm - bb), end: sm === null ? '' : toHM(sm + dur) };
+}
 $('#schedTitle').value = schedCfg.title; $('#schedArrive').value = schedCfg.arrive; $('#schedShowAll').checked = !!schedCfg.showAll; $('#schedNotes').value = schedCfg.notes;
 $('#schedTitle').addEventListener('input', e => { schedCfg.title = e.target.value; saveSched(); });
 $('#schedArrive').addEventListener('input', e => { schedCfg.arrive = e.target.value; saveSched(); });
 $('#schedNotes').addEventListener('input', e => { schedCfg.notes = e.target.value; saveSched(); });
+$('#schedDur').value = schedCfg.dur || 50; $('#schedBell').value = schedCfg.bellBefore ?? 5;
+$('#schedDur').addEventListener('change', e => { const v = Number(e.target.value); schedCfg.dur = v > 0 ? v : 50; e.target.value = schedCfg.dur; saveSched(); renderSched(); });
+$('#schedBell').addEventListener('change', e => { const v = Number(e.target.value); schedCfg.bellBefore = v >= 0 ? v : 5; saveSched(); renderSched(); });
 $('#schedShowAll').addEventListener('change', e => { schedCfg.showAll = e.target.checked; saveSched(); renderSched(); });
 $('#schedLogo').addEventListener('change', e => {
   const f = e.target.files[0]; if (!f) return;
@@ -2041,6 +2059,8 @@ function schedSD() {
   (schedCfg.extraDates || []).forEach(d => { if (!sd.dates.includes(d)) sd.dates.push(d); });
   const md = d => Number(d.slice(0, 2)) * 100 + Number(d.slice(3, 5));
   sd.dates.sort((a, b) => md(a) - md(b));
+  // 학년별로 보여 줄 교시 수 (시험이 있는 교시보다 적게는 못 함)
+  sd.grades.forEach(g => { const want = Number((schedCfg.gradePeriods || {})[g.grade]); g.maxP = Math.max(g.maxExamP, want > 0 ? want : g.maxP, 1); });
   return sd;
 }
 let pickChip = null;
@@ -2054,7 +2074,7 @@ function renderSched() {
     for (let p = 1; p <= g.maxP + 1; p++) {
       const extra = p > g.maxP, tm = timeOf(p);
       html += `<tr class="g${g.grade}${extra ? ' extra' : ''}">`;
-      if (p === 1) html += `<td class="g hd" rowspan="${g.maxP + 1}">${g.grade}</td>`;
+      if (p === 1) html += `<td class="g hd" rowspan="${g.maxP + 1}">${g.grade}<div style="font-size:11px;font-weight:400;margin-top:6px;white-space:nowrap">교시 <button class="x" data-gp="${g.grade}" data-d="-1" title="마지막 교시 줄 빼기" style="font-size:14px;padding:0 4px">−</button><button class="x" data-gp="${g.grade}" data-d="1" title="교시 줄 추가" style="font-size:14px;padding:0 4px">+</button></div></td>`;
       html += `<td class="p hd">${extra ? '+' : p}</td><td class="tm hd">${extra ? '새 교시' : `<small>(예비령 ${esc(tm.bell)})</small>${esc(tm.start)}~${esc(tm.end)}`}</td>`;
       for (const d of sd.dates) {
         const list = g.cells[d + '|' + p] || [];
@@ -2087,12 +2107,24 @@ function renderSched() {
     td.addEventListener('drop', e => { e.preventDefault(); td.classList.remove('over'); try { const d = JSON.parse(e.dataTransfer.getData('text/plain')); if (d.grade === +td.dataset.grade) doSubjectMove(d.grade, d.subject, d.from, td.dataset.slot); } catch (err) {} });
     td.addEventListener('click', () => { if (pickChip && pickChip.dataset.grade === td.dataset.grade) { const c = pickChip; clearPick(); doSubjectMove(+c.dataset.grade, c.dataset.subject, c.dataset.slot, td.dataset.slot); } });
   });
+  tbl.querySelectorAll('[data-gp]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    const g = sd.grades.find(x => x.grade === +b.dataset.gp), n = g.maxP + Number(b.dataset.d);
+    if (n < g.maxExamP) { toast(`${g.grade}학년 ${g.maxP}교시에 시험이 있어 줄일 수 없습니다. 과목을 먼저 다른 교시로 옮겨 주세요.`, 4500); return; }
+    if (n < 1 || n > 9) return;
+    schedCfg.gradePeriods = Object.assign({}, schedCfg.gradePeriods, { [g.grade]: n }); saveSched(); renderSched();
+  }));
   tbl.querySelectorAll('[data-editdate]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); openDateEditor(b); }));
   tbl.querySelectorAll('[data-deldate]').forEach(b => b.addEventListener('click', () => { schedCfg.extraDates = schedCfg.extraDates.filter(x => x !== b.dataset.deldate); saveSched(); renderSched(); }));
   // 시간 칸
   const maxP = Math.max(1, ...sd.grades.map(g => g.maxP));
-  $('#schedTimes').innerHTML = '<span></span><span class="muted">예비령</span><span class="muted">시작</span><span class="muted">끝</span>' + [...Array(maxP + 1).keys()].map(i => i + 1).map(p => { const t = timeOf(p); return `<b>${p}교시</b><input data-p="${p}" data-k="bell" value="${esc(t.bell)}"><input data-p="${p}" data-k="start" value="${esc(t.start)}"><input data-p="${p}" data-k="end" value="${esc(t.end)}">`; }).join('');
-  $('#schedTimes').querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => { const p = inp.dataset.p; schedCfg.times[p] = Object.assign(timeOf(p), { [inp.dataset.k]: inp.value.trim() }); saveSched(); renderSched(); }));
+  $('#schedTimes').innerHTML = '<span></span><span class="muted">시작</span><span class="muted">시험 시간(분)</span><span class="muted">예비령 · 끝 (자동)</span>' + [...Array(maxP).keys()].map(i => i + 1).map(p => { const t = timeOf(p); return `<b>${p}교시</b><input type="time" data-p="${p}" data-k="start" value="${esc(t.start)}" style="width:118px"><input type="number" min="10" max="180" data-p="${p}" data-k="dur" value="${t.durCustom ? t.dur : ''}" placeholder="${esc(schedCfg.dur || 50)}" style="width:70px"><span class="muted" style="white-space:nowrap">예비령 ${esc(t.bell)} · ${esc(t.start)}~${esc(t.end)}</span>`; }).join('');
+  $('#schedTimes').querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => {
+    const p = inp.dataset.p, cur = Object.assign({}, schedCfg.times[p] || {});
+    if (inp.dataset.k === 'start') { if (inp.value) cur.start = inp.value; else delete cur.start; }
+    else { const v = Number(inp.value); if (v > 0) cur.dur = v; else delete cur.dur; }
+    schedCfg.times[p] = cur; saveSched(); renderSched();
+  }));
   // 학점 표
   const subs = []; sd.grades.forEach(g => { const seen = new Set(); Object.values(g.cells).flat().forEach(it => { if (!seen.has(it.subject)) { seen.add(it.subject); subs.push({ grade: g.grade, subject: it.subject }); } }); });
   $('#schedCredits').innerHTML = '<thead><tr><th>학년</th><th>과목</th><th>학점</th></tr></thead><tbody>' + subs.map(x => `<tr><td>${x.grade}학년</td><td>${esc(x.subject)}</td><td><input type="text" class="sm" data-k="${esc(x.grade + '|' + x.subject)}" value="${esc(creditOf(x.grade, x.subject, sd))}" style="max-width:70px"></td></tr>`).join('') + '</tbody>';
