@@ -295,33 +295,14 @@
           <input type="text" id="stuKey" spellcheck="false" style="flex:1;min-width:260px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;padding:6px 9px;border:1px solid #cfd3cf;border-radius:6px">
         </div>
         <div class="muted" style="font-size:12px;margin-top:4px">Apps Script 코드 맨 위 <code>UPLOAD_KEY = '…'</code> 안의 값과 같아야 올릴 수 있습니다. 열쇠가 맞지 않는다고 나오면 Apps Script에서 그 값을 복사해 이 칸에 붙여넣으세요(다시 배포할 필요 없음).</div>
-        <div class="row" style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)">
-          <span style="font-size:13px;min-width:70px">학생용 주소</span>
-          <b id="shortUrl" style="font-size:15px">—</b>
-          <button class="small" id="shortCopy">복사</button>
-          <span id="shortStatus" style="font-size:12.5px"></span>
-        </div>
-        <div class="row" style="margin-top:10px;align-items:flex-start;gap:16px">
-          <canvas id="qrPrev" width="168" height="168" style="border:1px solid var(--line);border-radius:8px;background:#fff"></canvas>
-          <div style="font-size:13px;flex:1;min-width:200px">
-            <b>QR 코드</b>
-            <div class="muted" style="margin:4px 0 8px">휴대폰 카메라로 찍으면 학생용 주소로 바로 들어갑니다. 짧은 주소에 연결되어 있어서 웹 앱 주소가 바뀌어도 이 QR은 그대로 쓸 수 있습니다.</div>
-            <div class="row"><button class="small primary" id="qrSave">QR 안내문 이미지 저장</button><button class="small" id="qrPdf">A4 게시용 PDF</button></div>
+        <div class="row" style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);align-items:flex-start;gap:16px">
+          <canvas id="qrPrev" width="168" height="168" style="width:168px;height:168px;border:1px solid var(--line);border-radius:8px;background:#fff"></canvas>
+          <div style="font-size:13px;flex:1;min-width:220px">
+            <b>학생에게 공유하기</b>
+            <div class="muted" style="margin:4px 0 8px" id="qrHint">위에 웹 앱 주소를 넣으면 QR 코드가 만들어집니다.</div>
+            <div class="row"><button class="small" id="urlCopy">주소 복사</button><button class="small primary" id="qrSave">QR 안내문 이미지 저장</button><button class="small" id="qrPdf">A4 게시용 PDF</button></div>
           </div>
         </div>
-        <details class="opts" id="shortSetup" style="margin-top:6px"><summary>짧은 주소 자동 연결 설정 (처음 한 번)</summary>
-          <div style="font-size:13px;margin-top:8px;line-height:1.7">
-            웹 앱 주소가 바뀌면 생성기가 짧은 주소를 자동으로 새 주소에 연결합니다. 이를 위해 이 저장소에만 쓸 수 있는 GitHub 토큰이 한 번 필요합니다.
-            <ol style="margin:6px 0;padding-left:20px">
-              <li>GitHub 로그인 → 오른쪽 위 프로필 → <b>Settings</b> → 맨 아래 <b>Developer settings</b> → <b>Personal access tokens → Fine-grained tokens</b> → <b>Generate new token</b></li>
-              <li>Token name: <code>examseat</code>, Expiration: 최대(1년) → Repository access: <b>Only select repositories</b> → <b id="repoName">gicheolkye.github.io</b></li>
-              <li>Permissions → Repository permissions → <b>Contents: Read and write</b> → <b>Generate token</b></li>
-              <li>나온 토큰(github_pat_…)을 아래 칸에 붙여넣고 저장</li>
-            </ol>
-            <div class="row"><input type="password" id="ghToken" placeholder="github_pat_…" style="flex:1;min-width:240px;font:inherit;font-size:13px;padding:6px 9px;border:1px solid #cfd3cf;border-radius:6px"><button class="small primary" id="ghSave">저장하고 연결</button><button class="small" id="ghClear">토큰 지우기</button></div>
-            <div class="muted" style="font-size:12px;margin-top:4px">토큰은 이 컴퓨터 브라우저에만 저장되고 GitHub에만 보내집니다. 1년 뒤 만료되면 같은 방법으로 새로 넣어 주세요.</div>
-          </div>
-        </details>
         <div class="muted" style="font-size:12.5px;margin-top:6px" id="stuUrlHint">처음 한 번 아래 설정을 마치고 주소를 넣어 두면, 다음부터는 변환 후 이 버튼만 누르면 학생 페이지가 바로 바뀝니다.</div>
       </div>
       <details class="opts" id="stuSetup" style="margin-top:0"><summary><b>처음 한 번 설정하기</b> (약 3분)</summary>
@@ -336,7 +317,7 @@
             <li><b>코드를 다시 붙여넣었을 때:</b> <b>배포 → 배포 관리 → 연필(수정) → 버전: 새 버전 → 배포</b> (저장만 하면 반영되지 않습니다. 주소는 그대로)</li>
             <li class="muted">권한 창이 뜨면 본인 계정으로 허용하세요. ‘확인되지 않은 앱’이 나오면 <b>고급 → 이동</b>을 누르면 됩니다.</li>
           </ul></li>
-        <li><b>주소 넣기</b>배포 후 나온 <b>웹 앱 URL</b>을 위 칸에 붙여넣고 <b>학생 조회 페이지에 올리기</b>. 학생들에게는 위의 <b>학생용 주소</b>(짧은 주소)를 안내하면 됩니다.</li>
+        <li><b>주소 넣기</b>배포 후 나온 <b>웹 앱 URL</b>을 위 칸에 붙여넣고 <b>학생 조회 페이지에 올리기</b>. 학생들에게는 <b>주소 복사</b>나 <b>QR 안내문</b>으로 공유하면 됩니다.</li>
       </ol>
       <div class="row" style="margin-top:6px"><span class="muted" style="font-size:12.5px">자동 올리기가 안 되는 환경이면:</span><button class="small" id="stuXlsx">조회용 시트 파일 받기</button><span class="muted" style="font-size:12.5px">→ 시트에서 파일 → 가져오기 → ‘스프레드시트 바꾸기’</span></div>
       </details>
@@ -1702,18 +1683,12 @@ async function gasPost(payload) {
 }
 $('#stuPing').addEventListener('click', async () => {
   stuStatus('확인 중…');
-  try { const j = await gasPost({ action: 'ping' }); stuStatus(`✓ ${j.msg} (현재 ${j.students}명 올라가 있음)${j.old ? ' — 예전 코드입니다. 새 버전으로 다시 배포하면 더 안정적입니다.' : ''}`); syncShort(); }
+  try { const j = await gasPost({ action: 'ping' }); stuStatus(`✓ ${j.msg} (현재 ${j.students}명 올라가 있음)${j.old ? ' — 예전 코드입니다. 새 버전으로 다시 배포하면 더 안정적입니다.' : ''}`); }
   catch (e) { stuStatus(e.message, true); }
 });
 
-// ---------- 짧은 주소 (github.io/<owner>.github.io/exam → 웹 앱 주소) ----------
-const GH = (() => {
-  const host = location.hostname;
-  const owner = host.endsWith('.github.io') ? host.split('.')[0] : 'gicheolkye';
-  return { owner, repo: owner + '.github.io', path: 'exam/target.json', short: `https://${owner}.github.io/exam` };
-})();
-$('#shortUrl').textContent = GH.short.replace('https://', '');
-// ---------- QR 코드 ----------
+// ---------- QR 코드 (웹 앱 주소) ----------
+const validUrl = u => /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec/.test(u || '');
 function qrMatrix(text) { const q = qrcode(0, 'M'); q.addData(text); q.make(); return q; }
 function drawQr(cv, text, px) {
   if (!window.qrcode) return false;
@@ -1734,17 +1709,30 @@ function qrPoster(w, h) {   // 안내문: 제목 + QR + 주소
   x.fillText(title, w / 2, h * 0.11);
   x.fillStyle = '#444'; x.font = `500 ${Math.round(w * 0.032)}px ${FONT}`;
   x.fillText('휴대폰 카메라로 QR을 찍고 학번·이름을 입력하세요', w / 2, h * 0.19);
-  const q = document.createElement('canvas'); drawQr(q, GH.short, Math.round(Math.min(w, h) * 0.62));
+  const q = document.createElement('canvas'); drawQr(q, stuCfg.url, Math.round(Math.min(w, h) * 0.62));
   x.imageSmoothingEnabled = false;
   const qs = q.width; x.drawImage(q, (w - qs) / 2, h * 0.24);
-  x.fillStyle = '#1d2321'; x.font = `700 ${Math.round(w * 0.045)}px ${FONT}`;
-  x.fillText(GH.short.replace('https://', ''), w / 2, h * 0.24 + qs + h * 0.06);
+  x.fillStyle = '#1d2321'; x.font = `600 ${Math.round(w * 0.034)}px ${FONT}`;
+  x.fillText('학번과 이름으로 내 고사실·좌석을 확인할 수 있어요', w / 2, h * 0.24 + qs + h * 0.055);
   x.fillStyle = '#888'; x.font = `400 ${Math.round(w * 0.026)}px ${FONT}`;
-  x.fillText('고사실이 바뀔 수 있으니 시험 전날 한 번 더 확인하세요', w / 2, h * 0.24 + qs + h * 0.12);
+  x.fillText('고사실이 바뀔 수 있으니 시험 전날 한 번 더 확인하세요', w / 2, h * 0.24 + qs + h * 0.105);
   return cv;
 }
-function renderQr() { if (!drawQr($('#qrPrev'), GH.short, 168)) { $('#qrPrev').replaceWith(Object.assign(document.createElement('div'), { textContent: 'QR 라이브러리를 불러오지 못했습니다', className: 'muted' })); } else { $('#qrPrev').style.width = '168px'; $('#qrPrev').style.height = '168px'; } }
+function renderQr() {
+  stuCfg.url = ($('#stuUrl').value || '').trim();
+  const cv = $('#qrPrev'), ok = validUrl(stuCfg.url);
+  ['qrSave', 'qrPdf', 'urlCopy'].forEach(id => $('#' + id).disabled = !ok);
+  if (!ok) { cv.width = 168; cv.height = 168; const x = cv.getContext('2d'); x.fillStyle = '#f7f6f2'; x.fillRect(0, 0, 168, 168); x.fillStyle = '#aaa'; x.font = '500 13px "Noto Sans KR", "Malgun Gothic", sans-serif'; x.textAlign = 'center'; x.fillText('웹 앱 주소를', 84, 76); x.fillText('넣으면 표시', 84, 96); $('#qrHint').textContent = '위에 웹 앱 주소를 넣으면 QR 코드가 만들어집니다.'; return; }
+  if (!drawQr(cv, stuCfg.url, 168)) { $('#qrHint').textContent = 'QR 라이브러리를 불러오지 못했습니다. 새로고침해 주세요.'; return; }
+  cv.style.width = '168px'; cv.style.height = '168px';
+  $('#qrHint').textContent = '휴대폰 카메라로 찍으면 조회 페이지로 바로 들어갑니다. 주소를 복사해 공지·단체방에 올리거나, QR 안내문을 저장해 게시하세요.';
+}
 renderQr();
+$('#stuUrl').addEventListener('input', renderQr);
+$('#urlCopy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(stuCfg.url); toast('조회 페이지 주소를 복사했습니다.'); }
+  catch (e) { const el = $('#stuUrl'); el.focus(); el.select(); toast('자동 복사가 막혀 있어 주소를 선택해 두었습니다. Ctrl+C로 복사하세요.', 4000); }
+});
 $('#qrSave').addEventListener('click', async () => {
   try { await document.fonts.load(`700 20px "Noto Sans KR"`); } catch (e) {}
   qrPoster(1200, 1500).toBlob(b => saveFile('학생조회_QR안내.png', b));
@@ -1755,62 +1743,7 @@ $('#qrPdf').addEventListener('click', async () => {
   pdf.addImage(qrPoster(2100, 2970), 'PNG', 0, 0, 210, 297, undefined, 'FAST');
   await saveFile('학생조회_QR안내_A4.pdf', pdf.output('blob'));
 });
-$('#repoName').textContent = GH.repo;
-const shortStatus = (t, kind) => { const el = $('#shortStatus'); el.textContent = t; el.style.color = kind === 'bad' ? 'var(--warn)' : kind === 'ok' ? 'var(--accent)' : 'var(--muted)'; };
-$('#shortCopy').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(GH.short); toast('학생용 주소를 복사했습니다: ' + GH.short); }
-  catch (e) { toast(GH.short, 5000); }
-});
-const ghToken = () => stuCfg.ghToken || '';
-const b64 = s => btoa(unescape(encodeURIComponent(s)));
-const unb64 = s => decodeURIComponent(escape(atob(s.replace(/\s/g, ''))));
-async function readShortTarget() {
-  // 토큰이 있으면 API(즉시 최신), 없으면 공개 파일
-  if (ghToken()) {
-    const r = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`, { headers: { Authorization: 'Bearer ' + ghToken(), Accept: 'application/vnd.github+json' }, cache: 'no-store' });
-    if (r.status === 401 || r.status === 403) throw new Error('GitHub 토큰이 맞지 않거나 권한(Contents: Read and write)이 없습니다.');
-    if (r.status === 404) return { url: '', sha: null };
-    const j = await r.json();
-    let d = {}; try { d = JSON.parse(unb64(j.content)); } catch (e) {}
-    return { url: d.url || '', sha: j.sha };
-  }
-  try { const r = await fetch(`${GH.short}/target.json?t=${Date.now()}`, { cache: 'no-store' }); const d = await r.json(); return { url: d.url || '', sha: null }; }
-  catch (e) { return { url: null, sha: null }; }
-}
-async function syncShort() {
-  const url = (stuCfg.url || '').trim();
-  if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec/.test(url)) { shortStatus(''); return; }
-  try {
-    const cur = await readShortTarget();
-    if (cur.url === url) { shortStatus('✓ 지금 웹 앱 주소로 연결되어 있음', 'ok'); return; }
-    if (!ghToken()) {
-      shortStatus(cur.url === null ? '(이 화면에서는 연결 상태를 확인할 수 없음)' : '짧은 주소가 아직 이 웹 앱 주소와 연결되지 않았습니다 → 아래 ‘자동 연결 설정’', cur.url === null ? '' : 'bad');
-      if (cur.url !== null) $('#shortSetup').open = true;
-      return;
-    }
-    shortStatus('짧은 주소를 새 웹 앱 주소로 연결하는 중…');
-    const body = JSON.stringify({ url, updated: new Date().toISOString() }, null, 2) + '\n';
-    const r = await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`, {
-      method: 'PUT', headers: { Authorization: 'Bearer ' + ghToken(), Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ message: '학생 조회 짧은 주소를 새 웹 앱 주소로 갱신', content: b64(body) }, cur.sha ? { sha: cur.sha } : {}))
-    });
-    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error('GitHub에 저장하지 못했습니다: ' + (j.message || r.status)); }
-    shortStatus('✓ 짧은 주소를 새 웹 앱 주소로 연결했습니다 (1~2분 뒤 반영)', 'ok');
-    toast('짧은 주소가 새 웹 앱 주소로 연결되었습니다.');
-  } catch (e) {
-    shortStatus(location.hostname.endsWith('github.io') ? e.message : '짧은 주소 연결은 github.io 생성기에서만 됩니다.', 'bad');
-  }
-}
-$('#ghSave').addEventListener('click', () => {
-  const v = $('#ghToken').value.trim();
-  if (!v) { toast('토큰을 붙여넣어 주세요.'); return; }
-  stuCfg.ghToken = v; saveStu(); $('#ghToken').value = ''; $('#ghToken').placeholder = '저장됨 (바꾸려면 새로 붙여넣기)';
-  syncShort();
-});
-$('#ghClear').addEventListener('click', () => { delete stuCfg.ghToken; saveStu(); $('#ghToken').placeholder = 'github_pat_…'; shortStatus('토큰을 지웠습니다.'); });
-if (ghToken()) $('#ghToken').placeholder = '저장됨 (바꾸려면 새로 붙여넣기)';
-$('#stuUrl').addEventListener('change', () => syncShort());
-setTimeout(syncShort, 800);
+
 $('#stuUpload').addEventListener('click', async () => {
   if (!result) { toast('먼저 변환해 주세요.'); return; }
   busy(true, '학생 조회 페이지에 올리는 중…');
@@ -1820,7 +1753,6 @@ $('#stuUpload').addEventListener('click', async () => {
     const j = await gasPost({ action: 'upload', title: stuCfg.title, notice: stuCfg.notice, open: true, header: tb.header, rows: tb.rows, codeRows: tb.codeRows });
     busy(false); stuStatus('✓ ' + j.msg + ' ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })); toast(j.msg);
     $('#stuSetup').open = false;
-    syncShort();
   } catch (e) { busy(false); stuStatus(e.message, true); toast(e.message, 5000); }
 });
 $('#stuCodeText').addEventListener('focus', e => e.target.select());
