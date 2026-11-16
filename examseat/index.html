@@ -721,7 +721,7 @@
     }
     const L = v.split('\n'); const subj = L[0] || '', loc = L[2] || '';
     const m = /^(.*?)\s*\/\s*(\d+)\s*$/.exec(loc);
-    if (m) return `${subj}\n고사실: ${roomLabelC(m[1].trim())}${/^[1-3]\d{2}$/.test(m[1].trim()) ? ` (${m[1].trim()}호)` : ''}\n좌석 ${parseInt(m[2], 10)}번`;
+    if (m) return `${subj}\n고사실: ${roomLabelC(m[1].trim())}${/^[1-3]\d{2}$/.test(m[1].trim()) ? ` (${m[1].trim()})` : ''}\n좌석 ${parseInt(m[2], 10)}번`;
     if (/학년\s*\d+반/.test(loc)) return `${subj}\n고사실: 우리 반 교실 (${loc})\n좌석 ${parseInt(id.slice(-2), 10)}번 (출석번호)`;
     return `${subj}\n${loc}`;
   }
