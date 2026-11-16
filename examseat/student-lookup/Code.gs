@@ -16,6 +16,8 @@
  */
 
 var UPLOAD_KEY = '__UPLOAD_KEY__';   // 생성기만 데이터를 올릴 수 있게 하는 비밀 열쇠 (생성기가 자동으로 넣음)
+                                      // 비어 있으면(__UPLOAD_KEY__) 처음 올린 생성기의 열쇠를 기억해 짝을 맺습니다.
+var CODE_VERSION = 3;
 var MAX_FAIL = 5;      // 같은 학번으로 이만큼 틀리면
 var LOCK_MIN = 10;     // 이 시간(분) 동안 조회 막기
 
@@ -37,8 +39,9 @@ function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
     var d = JSON.parse(e.postData.contents);
-    if (!UPLOAD_KEY || UPLOAD_KEY.indexOf('__') === 0 || d.key !== UPLOAD_KEY) return out({ ok: false, msg: '올리기 열쇠가 맞지 않습니다. 생성기의 코드를 다시 붙여넣었는지 확인하세요.' });
-    if (d.action === 'ping') return out({ ok: true, msg: '연결되었습니다.', students: Math.max(0, (SpreadsheetApp.getActive().getSheetByName('시간표') || { getLastRow: function () { return 1; } }).getLastRow() - 1) });
+    var exp = expectedKey_(d.key);
+    if (!d.key || d.key !== exp) return out({ ok: false, code: 'bad_key', ver: CODE_VERSION, msg: '올리기 열쇠가 맞지 않습니다.' });
+    if (d.action === 'ping') return out({ ok: true, ver: CODE_VERSION, msg: '연결되었습니다.', students: Math.max(0, (SpreadsheetApp.getActive().getSheetByName('시간표') || { getLastRow: function () { return 1; } }).getLastRow() - 1) });
     lock.waitLock(20000);
     var ss = SpreadsheetApp.getActive();
     writeSheet_(ss, '설정', [['항목', '값', '설명'], ['제목', d.title || '시험 시간표 조회', '조회 페이지 맨 위 제목'], ['안내', d.notice || '', '제목 아래 안내 문구'], ['공개', d.open === false ? 'N' : 'Y', 'N으로 바꾸면 조회가 바로 막힙니다'], ['올린 시각', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm'), '생성기에서 마지막으로 올린 시각']]);
@@ -52,6 +55,20 @@ function doPost(e) {
   } finally {
     try { lock.releaseLock(); } catch (e2) {}
   }
+}
+
+/** 코드에 열쇠가 있으면 그것을, 없으면 처음 올린 생성기의 열쇠를 기억해서 씀 */
+function expectedKey_(incoming) {
+  if (UPLOAD_KEY && UPLOAD_KEY.indexOf('__') !== 0) return UPLOAD_KEY;
+  var props = PropertiesService.getScriptProperties();
+  var k = props.getProperty('UPLOAD_KEY');
+  if (!k && incoming) { props.setProperty('UPLOAD_KEY', String(incoming)); k = String(incoming); }
+  return k;
+}
+
+/** 다른 컴퓨터의 생성기와 다시 짝을 맺고 싶을 때 Apps Script 편집기에서 한 번 실행 */
+function resetUploadKey() {
+  PropertiesService.getScriptProperties().deleteProperty('UPLOAD_KEY');
 }
 
 function writeSheet_(ss, name, rows) {
