@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>R을 활용한 시험 문항 분석 · 확률과 통계</title>
+<meta name="description" content="2026학년도 1학기 중간고사 확률과 통계 선택형 21문항을 R로 분석한 강의 자료. 고전검사이론(난이도·변별도)과 문항반응이론(문항특성곡선).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Gowun+Batang:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #f4f5f2; --surface: #ffffff; --surface-2: #f0f1ed;
+  --ink: #1d2421; --muted: #5f6b66; --faint: #8a948f; --line: #d9ddd8;
+  --accent: #6b4c8a; --accent-soft: #ede6f4;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --ok: #1f7a4d; --ok-soft: #e2f1e8; --warn: #9a5b00; --warn-soft: #fbefd9; --bad: #b3261e; --bad-soft: #fbe5e3;
+  --grid: rgba(0,0,0,.07); --code-bg: #1d2421; --code-ink: #e5ebe8;
+  --font-display: "Gowun Batang", "Nanum Myeongjo", serif;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141917; --surface: #1c2320; --surface-2: #232b28; --ink: #e5ebe8; --muted: #9aa8a2; --faint: #75837d; --line: #303a36;
+    --accent: #c3a6e6; --accent-soft: #2c2536;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --ok: #7cc4ad; --ok-soft: #1f3129; --warn: #e3b26e; --warn-soft: #362b1b; --bad: #e69a9a; --bad-soft: #3a2323;
+    --grid: rgba(255,255,255,.08); --code-bg: #0f1312; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1c2320; --surface-2: #232b28; --ink: #e5ebe8; --muted: #9aa8a2; --faint: #75837d; --line: #303a36;
+  --accent: #c3a6e6; --accent-soft: #2c2536;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --ok: #7cc4ad; --ok-soft: #1f3129; --warn: #e3b26e; --warn-soft: #362b1b; --bad: #e69a9a; --bad-soft: #3a2323;
+  --grid: rgba(255,255,255,.08); --code-bg: #0f1312; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15.5px; line-height: 1.7; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+/* top bar */
+.bar { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.bar .wrap { display: flex; align-items: center; gap: 18px; height: 52px; overflow-x: auto; white-space: nowrap; }
+.bar .home { font-size: 13px; color: var(--muted); text-decoration: none; }
+.bar nav { display: flex; gap: 4px; margin-left: auto; }
+.bar nav a { font-size: 13.5px; color: var(--muted); text-decoration: none; padding: 5px 10px; border-radius: 7px; }
+.bar nav a:hover, .bar nav a.on { background: var(--accent-soft); color: var(--accent); }
+
+/* hero */
+.hero { padding: 56px 0 36px; border-bottom: 1px solid var(--line); }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-size: clamp(30px, 5vw, 46px); line-height: 1.2; margin: 10px 0 12px; text-wrap: balance; }
+.hero p.lead { color: var(--muted); max-width: 64ch; margin: 0 0 22px; font-size: 16.5px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.meta span { font-size: 13px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; color: var(--muted); }
+
+/* sections */
+section.chap { padding: 48px 0 8px; scroll-margin-top: 56px; }
+.chap-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px; }
+.chap-num { font-family: var(--font-mono); font-size: 13px; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 0 7px; }
+h2 { font-family: var(--font-display); font-size: 28px; margin: 0; line-height: 1.3; }
+h3 { font-size: 17.5px; margin: 0 0 8px; }
+p { margin: 0 0 12px; }
+.muted { color: var(--muted); }
+.small { font-size: 13.5px; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin-bottom: 18px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.grid2 > .card, .grid3 > .card { margin-bottom: 0; }
+
+/* compare table */
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12.5px; color: var(--muted); font-weight: 600; background: var(--surface-2); }
+td.num, th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.formula { font-family: var(--font-mono); font-size: 17px; background: var(--surface-2); border-radius: 10px; padding: 14px 16px; margin: 10px 0 12px; text-align: center; }
+.formula small { display: block; font-family: var(--font-body); font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.crit { display: grid; gap: 6px; font-size: 13.5px; }
+.crit div { display: flex; justify-content: space-between; gap: 10px; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); }
+.crit b { font-family: var(--font-mono); font-weight: 500; }
+
+/* badges */
+.badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.b-ok { background: var(--ok-soft); color: var(--ok); }
+.b-warn { background: var(--warn-soft); color: var(--warn); }
+.b-bad { background: var(--bad-soft); color: var(--bad); }
+.b-n { background: var(--surface-2); color: var(--muted); }
+
+/* steps */
+.steps { counter-reset: s; display: grid; gap: 12px; }
+.step { display: grid; grid-template-columns: 34px 1fr; gap: 12px; }
+.step::before { counter-increment: s; content: counter(s); width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-family: var(--font-mono); }
+.step p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+pre.code { background: var(--code-bg); color: var(--code-ink); border-radius: 12px; padding: 18px 20px; overflow-x: auto; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.75; margin: 0; position: relative; }
+pre.code .c { color: #8fa39a; }
+pre.code .f { color: #9cc8ff; }
+pre.code .s { color: #f0c58a; }
+.copy { position: absolute; top: 10px; right: 10px; font: inherit; font-size: 12px; background: rgba(255,255,255,.1); color: #e5ebe8; border: 1px solid rgba(255,255,255,.18); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+.dl { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.dl a { text-decoration: none; font-size: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 14px; border-radius: 9px; }
+.dl a:hover { border-color: var(--accent); color: var(--accent); }
+
+/* KPI */
+.kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.kpi .l { font-size: 12.5px; color: var(--muted); }
+.kpi .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1.3; }
+.kpi .v small { font-size: 14px; font-weight: 500; color: var(--muted); }
+
+/* controls */
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.controls .lab { font-size: 12.5px; color: var(--muted); margin-right: 2px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); padding: 3px; gap: 3px; }
+.seg button { border: 0; background: transparent; padding: 5px 11px; border-radius: 7px; cursor: pointer; font: inherit; font-size: 13px; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 0 0 1px var(--line); font-weight: 600; }
+select { font: inherit; font-size: 14px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.legend i.ln { height: 2px; width: 18px; border-radius: 1px; vertical-align: 3px; }
+.legend i.dt { width: 9px; height: 9px; border-radius: 50%; }
+.chart { position: relative; width: 100%; }
+
+.note { border-left: 3px solid var(--accent); background: var(--surface-2); padding: 12px 16px; border-radius: 0 10px 10px 0; font-size: 14px; color: var(--muted); margin-top: 14px; }
+.note b { color: var(--ink); }
+
+/* explorer */
+.explorer { display: grid; grid-template-columns: 1fr 260px; gap: 18px; align-items: start; }
+.params { display: grid; gap: 8px; }
+.param { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.param .l { font-size: 12px; color: var(--muted); }
+.param .v { font-family: var(--font-mono); font-size: 18px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+
+/* insights */
+.insight { border-top: 3px solid var(--accent); }
+.insight.warn { border-top-color: var(--warn); }
+.insight.bad { border-top-color: var(--bad); }
+.insight.ok { border-top-color: var(--ok); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.chip { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-2); border-radius: 6px; padding: 2px 8px; }
+
+/* simulator */
+.sim { display: grid; grid-template-columns: 1fr 260px; gap: 18px; align-items: start; }
+.slider { margin-bottom: 14px; }
+.slider .top { display: flex; justify-content: space-between; font-size: 13.5px; }
+.slider .top b { font-family: var(--font-mono); }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.presets button { font: inherit; font-size: 12.5px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+.presets button:hover { border-color: var(--accent); color: var(--accent); }
+
+figure { margin: 0; }
+figure img { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); background: #fff; display: block; }
+figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+.tablewrap { overflow-x: auto; }
+#sumTable td, #sumTable th { white-space: nowrap; }
+#sumTable tbody tr:hover { background: var(--surface-2); }
+.bar-mini { display: inline-block; height: 6px; border-radius: 3px; background: var(--s2); vertical-align: middle; margin-right: 6px; }
+
+footer.foot { border-top: 1px solid var(--line); margin-top: 48px; padding: 24px 0 48px; font-size: 13px; color: var(--muted); }
+
+@media (max-width: 820px) {
+  .grid2, .grid3, .explorer, .sim { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .bar nav { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="bar"><div class="wrap">
+  <a class="home" href="../">← 자료 모음</a>
+  <nav id="toc">
+    <a href="#why">들어가며</a>
+    <a href="#theory">문항 분석 이론</a>
+    <a href="#method">분석 방법</a>
+    <a href="#result">분석 결과</a>
+    <a href="#insight">해석</a>
+    <a href="#table">요약표</a>
+  </nav>
+</div></div>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">광영고등학교 · 데이터 수업 강의 자료</div>
+  <h1>R을 활용한 시험 문항 분석</h1>
+  <p class="lead">우리 학교 시험문제는 좋은 시험문제일까? 2026학년도 1학기 중간고사 <b>확률과 통계 선택형 21문항</b>의 정오표를 R로 분석해 문항별 난이도와 변별도를 확인하고, 문항반응이론으로 문항특성곡선을 그려 봅니다.</p>
+  <div class="meta">
+    <span>확률과 통계 · 1학기 중간고사</span><span>선택형 21문항</span><span>응시 252명</span><span>R · ShinyItemAnalysis · ltm</span><span>계기철</span>
+  </div>
+</header>
+
+<!-- 1 -->
+<section class="chap" id="why">
+  <div class="chap-head"><span class="chap-num">01</span><h2>들어가며: 왜 문항 분석인가</h2></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>“한 문제 틀리면 2등급”</h3>
+      <p class="muted">내신 5등급제 전환과 ‘내신 킬러 문항’ 논란이 이어지면서, 시험이 학생들의 실력을 제대로 구분하고 있는지에 대한 관심이 커졌습니다. 지나치게 어렵거나 쉬운 문항, 상위권과 하위권을 가르지 못하는 문항은 성적의 신뢰도를 떨어뜨립니다.</p>
+    </div>
+    <div class="card">
+      <h3>매번 쓰는 교과협의회록…</h3>
+      <p class="muted">시험이 끝나면 “핵심 성취기준에 맞게 출제하였음”, “반별 평균 편차는 ○점”처럼 평균과 편차 중심으로 결과를 기록합니다. 하지만 <b>어떤 문항이 제 역할을 했는지</b>는 문항 단위로 따져 봐야 알 수 있습니다. 나이스 정오표와 R만 있으면 바로 확인할 수 있어요.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="chap" id="theory">
+  <div class="chap-head"><span class="chap-num">02</span><h2>문항 분석 이론</h2></div>
+
+  <div class="card">
+    <div class="tablewrap"><table>
+      <thead><tr><th style="width:12%"></th><th>고전검사이론 (CTT) · 같은 집단 안에서</th><th>문항반응이론 (IRT) · 다른 집단끼리도</th></tr></thead>
+      <tbody>
+        <tr><td><b>핵심</b></td><td>정답률(난이도)과 상·하위 집단의 정답률 차이(변별도)</td><td>능력 θ에 따른 정답 확률을 S자 곡선(문항특성곡선)으로 모형화</td></tr>
+        <tr><td><b>장점</b></td><td>계산이 간단하고 이해하기 쉬움</td><td>문항 모수가 응시 집단에 따라 크게 변하지 않아 문항 자체를 평가 가능 (TOEFL, 수능, 모의고사)</td></tr>
+        <tr><td><b>단점</b></td><td>응시 집단에 따라 값이 달라져 다른 집단 간 비교가 어려움 (같은 학교 안에서만)</td><td>수학적 원리가 어렵고 표본이 어느 정도 커야 함</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>CTT ① 난이도 P</h3>
+      <div class="formula">P = R / N<small>R: 정답자 수 · N: 전체 응시자 수 · 0 ≤ P ≤ 1</small></div>
+      <p class="small muted">이름은 ‘난이도’지만 실제로는 정답률이라 값이 클수록 쉬운 문항입니다.</p>
+      <div class="crit">
+        <div><span>어려운 문항</span><b>P &lt; 0.4</b></div>
+        <div><span>적정한 문항</span><b>0.4 ≤ P ≤ 0.8</b></div>
+        <div><span>쉬운 문항</span><b>P &gt; 0.8</b></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>CTT ② 변별도 (상하 지수, ULI)</h3>
+      <div class="formula">D = P<sub>H</sub> − P<sub>L</sub> = R<sub>H</sub>/N<sub>H</sub> − R<sub>L</sub>/N<sub>L</sub><small>상위 집단 정답률 − 하위 집단 정답률 (보통 총점 상·하위 27%)</small></div>
+      <div class="crit">
+        <div><span>변별력이 높은 문항</span><b>0.40 이상</b></div>
+        <div><span>변별력이 있는 문항</span><b>0.30 ~ 0.39</b></div>
+        <div><span>변별력이 낮은 문항</span><b>0.20 ~ 0.29</b></div>
+        <div><span>변별력이 매우 낮은 문항</span><b>0.10 ~ 0.19</b></div>
+        <div><span>변별력이 없는 문항</span><b>0.10 미만</b></div>
+      </div>
+      <p class="small muted" style="margin:8px 0 0">Ebel의 문항변별도 평가 기준</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>IRT: 능력에 따른 정답 확률, 문항특성곡선(ICC)</h3>
+    <p class="muted">학생의 능력을 θ(평균 0, 표준편차 1)로 두고, 능력이 높아질수록 정답 확률이 S자로 올라가는 곡선을 문항마다 추정합니다. 곡선의 <b>가로 위치</b>가 난이도 b, <b>기울기</b>가 변별도 a, <b>바닥 높이</b>가 추측도 c입니다.</p>
+    <div class="grid3" style="margin:14px 0">
+      <div class="param"><div class="l">1모수 (Rasch)</div><div style="font-family:var(--font-mono);font-size:14px">P(θ) = 1 / (1 + e<sup>−(θ−b)</sup>)</div><div class="small muted">난이도 b만 추정</div></div>
+      <div class="param"><div class="l">2모수 (2PL)</div><div style="font-family:var(--font-mono);font-size:14px">P(θ) = 1 / (1 + e<sup>−a(θ−b)</sup>)</div><div class="small muted">문항마다 변별도 a도 추정</div></div>
+      <div class="param"><div class="l">3모수 (3PL)</div><div style="font-family:var(--font-mono);font-size:14px">P(θ) = c + (1−c) / (1 + e<sup>−a(θ−b)</sup>)</div><div class="small muted">찍어서 맞힐 확률 c까지</div></div>
+    </div>
+    <p class="small muted">교재에 따라 지수에 1.7을 곱해(1.7a) 정규오자이브 모형에 맞추기도 합니다. 이 자료의 계산과 R의 <code>ltm</code> 패키지는 1.7 없이 쓰는 방식입니다.</p>
+    <div class="tablewrap"><table style="max-width:520px">
+      <thead><tr><th>IRT 변별도 a</th><th>해석 (Baker)</th></tr></thead>
+      <tbody>
+        <tr><td class="num" style="text-align:left">0</td><td>없다</td></tr>
+        <tr><td class="num" style="text-align:left">0.01 ~ 0.34</td><td>거의 없다</td></tr>
+        <tr><td class="num" style="text-align:left">0.35 ~ 0.64</td><td>낮다</td></tr>
+        <tr><td class="num" style="text-align:left">0.65 ~ 1.34</td><td>적절하다</td></tr>
+        <tr><td class="num" style="text-align:left">1.35 ~ 1.69</td><td>높다</td></tr>
+        <tr><td class="num" style="text-align:left">1.70 이상</td><td>매우 높다</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <h3>직접 움직여 보기: 3모수 문항특성곡선</h3>
+    <p class="muted small">슬라이더로 a, b, c를 바꾸며 곡선이 어떻게 변하는지 확인하세요. 점선은 같은 a, b에서 추측도가 0일 때의 곡선입니다.</p>
+    <div class="sim">
+      <div>
+        <div class="legend"><span><i class="ln" style="background:var(--s1)"></i>3모수 곡선</span><span><i class="ln" style="background:var(--faint)"></i>c = 0 일 때</span></div>
+        <div class="chart" style="height:320px"><canvas id="simChart" role="img" aria-label="3모수 로지스틱 문항특성곡선 시뮬레이터"></canvas></div>
+      </div>
+      <div>
+        <div class="slider"><div class="top"><span>변별도 a · 기울기</span><b id="o-a">1.5</b></div><input type="range" id="sl-a" min="0.1" max="3" step="0.1" value="1.5" aria-label="변별도 a"></div>
+        <div class="slider"><div class="top"><span>난이도 b · 위치</span><b id="o-b">0.0</b></div><input type="range" id="sl-b" min="-3" max="3" step="0.1" value="0" aria-label="난이도 b"></div>
+        <div class="slider"><div class="top"><span>추측도 c · 바닥</span><b id="o-c">0.20</b></div><input type="range" id="sl-c" min="0" max="0.5" step="0.01" value="0.2" aria-label="추측도 c"></div>
+        <div class="param" style="margin-bottom:12px"><div class="l">θ = b 에서 정답 확률</div><div class="v"><span id="o-mid">—</span><span class="small muted" style="font-family:var(--font-body)">= (1 + c) / 2</span></div></div>
+        <div class="presets">
+          <button data-p="1,0,0">1모수</button><button data-p="1.5,0,0">2모수</button><button data-p="1.5,0,0.2">3모수 (5지선다)</button>
+          <button data-p="2.5,-1,0.1">쉬운 문항</button><button data-p="2,1.5,0.1">어려운 문항</button><button data-p="0.3,0,0.2">변별도 낮음</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="chap" id="method">
+  <div class="chap-head"><span class="chap-num">03</span><h2>분석 방법: 나이스 정오표에서 R까지</h2></div>
+  <div class="grid2">
+    <div class="card">
+      <div class="steps">
+        <div class="step"><div><h3>나이스에서 정오표 받기</h3><p>교과담임 → 지필평가조회/통계 → 교과목별 학생답 정오표 → 조회 후 엑셀로 내려받기</p></div></div>
+        <div class="step"><div><h3>0과 1로 정리하기</h3><p>선택형은 맞은 문항 = 1, 틀린 문항 = 0. 문항이 열(1번~21번), 학생이 행이 되도록 정리하고 이름·학번은 지웁니다.</p></div></div>
+        <div class="step"><div><h3>Posit Cloud에서 R 실행</h3><p><a href="https://posit.cloud/">posit.cloud</a>에 접속해 프로젝트를 만들고 엑셀(또는 CSV)을 올린 뒤 아래 코드를 실행합니다. 설치 없이 브라우저에서 됩니다.</p></div></div>
+        <div class="step"><div><h3>그래프 읽고 문항 비교하기</h3><p>난이도·변별도 그래프와 문항특성곡선을 보며 실제 시험지 문항과 비교합니다.</p></div></div>
+      </div>
+      <p class="note small" style="margin-top:16px">서·논술형은 점수가 0점~만점으로 다양해 변별력이 좋을 가능성이 높습니다. 이 자료는 선택형 21문항만 분석했습니다.</p>
+    </div>
+    <div>
+<pre class="code"><button class="copy" type="button">복사</button><span class="c"># 0. 패키지 설치 (처음 한 번만)</span>
+<span class="f">install.packages</span>(c(<span class="s">"readxl"</span>, <span class="s">"ShinyItemAnalysis"</span>, <span class="s">"ltm"</span>))
+
+<span class="c"># 1. 데이터 불러오기 (정답 1, 오답 0)</span>
+<span class="f">library</span>(readxl)
+data1 &lt;- <span class="f">read_excel</span>(<span class="s">"data1.xlsx"</span>, sheet = <span class="s">"DATA"</span>)
+<span class="c"># 또는 이 페이지의 CSV 사용</span>
+<span class="c"># data1 &lt;- read.csv("responses.csv", check.names = FALSE,</span>
+<span class="c">#                   fileEncoding = "UTF-8-BOM")</span>
+
+<span class="c"># 2. 고전검사이론: 난이도 · 변별도</span>
+<span class="f">library</span>(ShinyItemAnalysis)
+<span class="f">DDplot</span>(data1)                       <span class="c"># 상위 1/3 vs 하위 1/3</span>
+<span class="f">DDplot</span>(data1, k = 5, l = 4, u = 5)  <span class="c"># 상위권 vs 최상위권</span>
+<span class="f">ItemAnalysis</span>(data1)                 <span class="c"># 문항별 지표 표</span>
+
+<span class="c"># 3. 문항반응이론: 2모수 모형</span>
+<span class="f">library</span>(ltm)
+fit &lt;- <span class="f">ltm</span>(data1 ~ z1)
+<span class="f">coef</span>(fit)                <span class="c"># Dffclt = 난이도 b, Dscrmn = 변별도 a</span>
+<span class="f">plot</span>(fit, type = <span class="s">"ICC"</span>)  <span class="c"># 문항특성곡선</span>
+
+<span class="c"># 3모수 모형 (추측도 c 포함)</span>
+fit3 &lt;- <span class="f">tpm</span>(data1)
+<span class="f">coef</span>(fit3)</pre>
+      <div class="dl">
+        <a href="data/responses.csv" download>응답 데이터 (CSV, 이름 없음)</a>
+        <a href="analysis.R" download>R 코드 (analysis.R)</a>
+      </div>
+    </div>
+  </div>
+  <p class="small muted">R의 <code>DDplot()</code>은 기본값으로 총점 상위 1/3과 하위 1/3을 비교합니다. 이 페이지의 변별도는 교과서식 상·하위 27%가 기본이고, 아래 그래프에서 R 기본값(1/3)으로도 바꿔 볼 수 있습니다.</p>
+</section>
+
+<!-- 4 -->
+<section class="chap" id="result">
+  <div class="chap-head"><span class="chap-num">04</span><h2>분석 결과</h2></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card">
+    <h3>총점 분포</h3>
+    <p class="muted small" id="histNote"></p>
+    <div class="chart" style="height:240px"><canvas id="histChart" role="img" aria-label="총점별 학생 수 막대그래프"></canvas></div>
+  </div>
+
+  <div class="card">
+    <h3>문항별 난이도 · 변별도 (DDplot)</h3>
+    <div class="controls">
+      <span class="lab">변별도 기준</span>
+      <div class="seg" id="discSeg">
+        <button data-k="uli" aria-pressed="true">상·하위 27%</button>
+        <button data-k="uli3">R 기본 (1/3)</button>
+        <button data-k="top">상위권 vs 최상위권</button>
+        <button data-k="ex_uli">찍기 학생 제외</button>
+      </div>
+    </div>
+    <div class="controls">
+      <span class="lab">정렬</span>
+      <div class="seg" id="sortSeg">
+        <button data-k="no" aria-pressed="true">문항 순서</button>
+        <button data-k="diff">난이도(정답률) 낮은 순</button>
+        <button data-k="disc">변별도 낮은 순</button>
+      </div>
+    </div>
+    <div class="legend"><span><i style="background:var(--s1)"></i>난이도 (정답률 P)</span><span><i style="background:var(--s2)"></i><span id="discLegend">변별도</span></span><span><i class="ln" style="background:var(--faint)"></i><span id="refLegend">기준선</span></span></div>
+    <div class="chart" style="height:360px"><canvas id="ddChart" role="img" aria-label="21개 문항의 난이도와 변별도 막대그래프"></canvas></div>
+    <p class="note" id="discNote"></p>
+  </div>
+
+  <div class="card">
+    <h3>문항 하나씩 살펴보기: 성적대별 정답률과 문항특성곡선</h3>
+    <p class="muted small">학생을 총점 순으로 5개 성적대(각 약 50명)로 나눈 실제 정답률(점)과, 2모수 모형으로 추정한 문항특성곡선(선)을 겹쳐 그렸습니다. 점이 곡선을 잘 따라가고 오른쪽으로 갈수록 가파르게 오르면 변별력이 좋은 문항입니다. 1번·4번·9번·16번처럼 <b>최하위 성적대의 점이 곡선보다 훨씬 위</b>에 있다면, 한 번호로 찍은 학생들이 맞힌 경우입니다(추측도 c가 없는 2모수 모형의 한계).</p>
+    <div class="explorer">
+      <div>
+        <div class="controls"><span class="lab">문항</span><select id="itemSel" aria-label="문항 선택"></select>
+          <div class="seg"><button id="prevBtn" aria-label="이전 문항">◀</button><button id="nextBtn" aria-label="다음 문항">▶</button></div></div>
+        <div class="legend"><span><i class="ln" style="background:var(--s1)"></i>2모수 문항특성곡선</span><span><i class="dt" style="background:var(--s2)"></i>성적대별 실제 정답률</span></div>
+        <div class="chart" style="height:320px"><canvas id="itemChart" role="img" aria-label="선택한 문항의 문항특성곡선과 성적대별 정답률"></canvas></div>
+      </div>
+      <div class="params" id="itemParams"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>21문항 문항특성곡선 한눈에 보기</h3>
+    <p class="muted small">2모수 모형으로 추정한 21개 곡선입니다. 위의 문항 선택과 연동되어 선택한 문항이 진하게 표시되고, 마우스를 올리면 문항 번호가 보입니다. 완만하게 누운 곡선들이 변별력이 낮은 문항입니다.</p>
+    <div class="legend"><span><i class="ln" style="background:var(--s1)"></i>선택한 문항</span><span><i class="ln" style="background:var(--s2)"></i>IRT 변별도 a &lt; 0.65 (낮음 이하)</span><span><i class="ln" style="background:var(--faint)"></i>나머지 문항</span></div>
+    <div class="chart" style="height:380px"><canvas id="allChart" role="img" aria-label="21개 문항의 문항특성곡선"></canvas></div>
+  </div>
+
+  <div class="card">
+    <figure>
+      <img src="img/icc_r_output.png" alt="R ltm 패키지 plot(fit, type='ICC')로 그린 문항특성곡선 출력 화면">
+      <figcaption>수업에서 R(<code>ltm</code>)로 직접 그린 문항특성곡선 출력 화면. 위의 인터랙티브 그래프와 같은 2모수 모형입니다.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="chap" id="insight">
+  <div class="chap-head"><span class="chap-num">05</span><h2>해석: 무엇을 알 수 있을까</h2></div>
+  <div class="grid2" id="insights"></div>
+</section>
+
+<!-- 6 -->
+<section class="chap" id="table">
+  <div class="chap-head"><span class="chap-num">06</span><h2>문항 요약표</h2></div>
+  <div class="card">
+    <div class="tablewrap"><table id="sumTable">
+      <thead><tr>
+        <th>문항</th><th class="num">난이도 P</th><th>수준</th><th class="num">변별도 (27%)</th><th>수준 (Ebel)</th>
+        <th class="num">상위권 변별</th><th class="num">문항-총점 상관</th><th class="num">IRT a</th><th class="num">IRT b</th><th>a 해석</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="small muted" style="margin:12px 0 0">상위권 변별: 5개 성적대 중 4(상위권)와 5(최상위권) 집단의 정답률 차이 · 문항-총점 상관: 그 문항을 뺀 총점과의 상관(교정된 문항-총점 상관) · IRT a, b: 2모수 로지스틱 모형(주변최대우도 추정, R <code>ltm</code>과 같은 모형). R에서 직접 계산하면 소수점 둘째 자리에서 조금 다를 수 있습니다.</p>
+  </div>
+</section>
+
+<footer class="foot">
+  광영고등학교 계기철 · 2026학년도 1학기 중간고사 확률과 통계 선택형 문항 분석 강의 자료<br>
+  학생 이름과 학번은 모두 지운 응답(0/1) 자료만 사용했습니다. · <a href="https://github.com/gicheolkye/gicheolkye.github.io/tree/main/itemanalysis">GitHub 저장소</a>
+</footer>
+</div>
+
+<script>
+const S = {"items":["1번","2번","3번","4번","5번","6번","7번","8번","9번","10번","11번","12번","13번","14번","15번","16번","17번","18번","19번","20번","21번"],"n":252,"m":21,"difficulty":[0.726,0.409,0.234,0.687,0.433,0.579,0.437,0.29,0.496,0.571,0.639,0.409,0.409,0.274,0.333,0.496,0.567,0.488,0.325,0.345,0.298],"uli":[0.647,0.838,0.706,0.544,0.235,0.882,0.765,0.691,0.368,0.647,0.735,0.794,0.897,0.735,0.676,0.309,0.618,0.779,0.882,0.735,0.706],"uli3":[0.631,0.762,0.595,0.583,0.167,0.81,0.726,0.595,0.298,0.619,0.714,0.738,0.798,0.655,0.619,0.286,0.607,0.69,0.821,0.643,0.56],"group5":[[0.314,0.52,0.84,0.96,1.0],[0.02,0.08,0.4,0.64,0.902],[0.0,0.04,0.08,0.2,0.843],[0.392,0.5,0.64,0.9,1.0],[0.353,0.38,0.38,0.32,0.725],[0.098,0.3,0.6,0.92,0.98],[0.078,0.14,0.42,0.64,0.902],[0.059,0.06,0.18,0.32,0.824],[0.392,0.42,0.4,0.44,0.824],[0.314,0.28,0.42,0.86,0.98],[0.255,0.36,0.66,0.92,1.0],[0.039,0.16,0.28,0.7,0.863],[0.02,0.22,0.2,0.64,0.961],[0.0,0.04,0.18,0.3,0.843],[0.118,0.08,0.26,0.4,0.804],[0.431,0.44,0.28,0.5,0.824],[0.314,0.24,0.48,0.82,0.98],[0.118,0.22,0.4,0.78,0.922],[0.02,0.0,0.1,0.58,0.922],[0.098,0.14,0.18,0.38,0.922],[0.039,0.14,0.2,0.32,0.784]],"groupN":[51,50,50,50,51],"top":[0.04,0.262,0.643,0.1,0.405,0.06,0.262,0.504,0.384,0.12,0.08,0.163,0.321,0.543,0.404,0.324,0.16,0.142,0.342,0.542,0.464],"rit":[0.467,0.63,0.675,0.425,0.174,0.595,0.569,0.6,0.252,0.498,0.534,0.574,0.648,0.625,0.54,0.249,0.497,0.546,0.752,0.59,0.545],"a":[2.957,2.148,2.764,0.825,0.219,2.581,1.952,1.928,0.321,1.952,3.012,1.776,2.403,2.047,1.647,0.35,1.996,1.751,3.377,1.906,1.624],"b":[-0.74,0.218,0.821,-1.112,1.238,-0.323,0.138,0.692,0.032,-0.308,-0.485,0.253,0.199,0.738,0.565,0.027,-0.294,-0.027,0.426,0.473,0.723],"totalMean":9.44,"totalSD":5.81,"alpha":0.9,"hist":[0,1,8,8,55,20,18,16,14,9,9,13,6,7,9,3,11,7,9,10,7,12],"cut27":68,"straightN":50,"straightScore4":42,"ex_difficulty":[0.822,0.505,0.292,0.718,0.411,0.703,0.53,0.347,0.485,0.629,0.713,0.495,0.495,0.342,0.401,0.485,0.624,0.594,0.406,0.416,0.356],"ex_uli":[0.491,0.8,0.782,0.618,0.473,0.655,0.709,0.764,0.545,0.745,0.709,0.691,0.782,0.764,0.673,0.473,0.745,0.655,0.891,0.709,0.673],"ex_n":202,"straightHit":[17,1,0,28,26,4,3,3,27,17,17,3,3,0,3,27,17,3,0,3,3]};
+const N = S.items.length;
+
+/* ---------- theme (follow hub setting) ---------- */
+try { const t = localStorage.getItem("hub-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function alpha(hex, a) { const h = hex.replace('#',''); const n = parseInt(h.length === 3 ? h.split('').map(x=>x+x).join('') : h, 16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+
+/* ---------- classification ---------- */
+const diffCls = p => p < 0.4 ? ["어려움","b-warn"] : p <= 0.8 ? ["적정","b-ok"] : ["쉬움","b-n"];
+const discCls = d => d >= 0.4 ? ["높음","b-ok"] : d >= 0.3 ? ["있음","b-ok"] : d >= 0.2 ? ["낮음","b-warn"] : d >= 0.1 ? ["매우 낮음","b-bad"] : ["없음","b-bad"];
+const aCls = a => a < 0.35 ? ["거의 없다","b-bad"] : a < 0.65 ? ["낮다","b-warn"] : a < 1.35 ? ["적절하다","b-ok"] : a < 1.7 ? ["높다","b-ok"] : ["매우 높다","b-ok"];
+const badge = c => `<span class="badge ${c[1]}">${c[0]}</span>`;
+const f3 = x => x.toFixed(3), f2 = x => x.toFixed(2);
+const mean = a => a.reduce((s,x)=>s+x,0)/a.length;
+const icc = (t,a,b,c=0) => c + (1-c)/(1+Math.exp(-a*(t-b)));
+
+/* ---------- shared chart defaults ---------- */
+function baseOpts() {
+  Chart.defaults.font.family = css('--font-body');
+  Chart.defaults.color = css('--muted');
+  return {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+    plugins: { legend: { display: false },
+      tooltip: { backgroundColor: css('--ink'), titleColor: css('--bg'), bodyColor: css('--bg'), padding: 10, cornerRadius: 8, displayColors: true, boxPadding: 4 } },
+  };
+}
+const grid = () => ({ color: css('--grid') });
+const refLines = { id: 'refLines', afterDatasetsDraw(ch, args, o) {
+  if (!o || !o.lines) return; const { ctx, chartArea: a, scales: { y } } = ch;
+  ctx.save(); ctx.setLineDash([5,4]); ctx.lineWidth = 1; ctx.strokeStyle = css('--faint'); ctx.fillStyle = css('--muted'); ctx.font = '11px ' + css('--font-body');
+  o.lines.forEach(L => { const yy = y.getPixelForValue(L.v); ctx.beginPath(); ctx.moveTo(a.left, yy); ctx.lineTo(a.right, yy); ctx.stroke(); const tw = ctx.measureText(L.t).width; ctx.save(); ctx.setLineDash([]); ctx.fillStyle = css('--surface'); ctx.fillRect(a.right - tw - 10, yy - 17, tw + 8, 15); ctx.restore(); ctx.fillText(L.t, a.right - tw - 6, yy - 6); });
+  ctx.restore(); } };
+
+const charts = {};
+
+/* ---------- KPI ---------- */
+function kpis() {
+  const hi = S.uli.filter(d => d >= 0.4).length;
+  document.getElementById('kpis').innerHTML = [
+    ["응시 인원", `${S.n}<small> 명</small>`],
+    ["평균 총점", `${S.totalMean}<small> / ${N}</small>`],
+    ["평균 정답률", `${f2(mean(S.difficulty))}`],
+    ["변별도 0.40 이상", `${hi}<small> / ${N} 문항</small>`],
+    ["신뢰도 (α)", `${f2(S.alpha)}`],
+  ].map(([l,v]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
+  document.getElementById('histNote').innerHTML =
+    `평균 ${S.totalMean}점, 표준편차 ${S.totalSD}점으로 평균 정답률이 절반에 못 미치는 어려운 시험이었습니다. 그런데 <b>4점에 ${S.hist[4]}명</b>이 몰려 있습니다. 이 가운데 ${S.straightScore4}명은 21문항 중 15개 이상을 <b>같은 번호로 표기</b>한 학생입니다(전체 ${S.straightN}명, ${(S.straightN/S.n*100).toFixed(0)}%).`;
+}
+
+/* ---------- histogram ---------- */
+function hist() {
+  const s1 = css('--s1'), s2 = css('--s2');
+  charts.hist?.destroy();
+  charts.hist = new Chart(document.getElementById('histChart'), {
+    type: 'bar',
+    data: { labels: S.hist.map((_,i)=>i), datasets: [{ data: S.hist, backgroundColor: S.hist.map((_,i)=> i===4 ? s2 : s1), borderRadius: 4, borderSkipped: 'start', categoryPercentage: .9, barPercentage: .9 }] },
+    options: { ...baseOpts(), plugins: { ...baseOpts().plugins, tooltip: { ...baseOpts().plugins.tooltip, displayColors: false, callbacks: { title: i => `${i[0].label}점`, label: i => ` ${i.parsed.y}명` } } },
+      scales: { x: { grid: { display: false }, title: { display: true, text: '총점 (21점 만점)' } }, y: { grid: grid(), border: { display: false }, title: { display: true, text: '학생 수' }, ticks: { precision: 0 } } } }
+  });
+}
+
+/* ---------- DD plot ---------- */
+let discKey = 'uli', sortKey = 'no';
+const DISC = {
+  uli:    { lab: '변별도 (상·하위 27%)', ref: [{v:.4,t:'0.40 높음'},{v:.2,t:'0.20 낮음'}],
+            note: () => `총점 상위 27%(${S.cut27}명)와 하위 27%(${S.cut27}명)의 정답률 차이입니다. <b>${N}문항 중 ${S.uli.filter(d=>d>=.4).length}문항이 0.40 이상</b>으로 변별력이 높고, <b>5번(${f3(S.uli[4])}), 16번(${f3(S.uli[15])}), 9번(${f3(S.uli[8])})</b>만 상대적으로 낮습니다.` },
+  uli3:   { lab: '변별도 (R 기본: 상·하위 1/3)', ref: [{v:.4,t:'0.40 높음'},{v:.2,t:'0.20 낮음'}],
+            note: () => `R <code>DDplot(data1)</code>의 기본값처럼 총점을 3등분해 상위 1/3과 하위 1/3을 비교했습니다. 27% 기준보다 값이 조금씩 작지만 순위는 거의 같습니다. 5번(${f3(S.uli3[4])})은 이 기준에서 ‘매우 낮음’입니다.` },
+  top:    { lab: '상위권 변별도 (성적대 5 − 4)', ref: [{v:.2,t:'0.20'}],
+            note: () => `R <code>DDplot(data1, k = 5, l = 4, u = 5)</code>와 같은 비교입니다. 학생을 5개 성적대로 나눠 <b>상위권(4)과 최상위권(5)</b>의 정답률 차이를 봅니다. 1번(${f2(S.top[0])}), 6번(${f2(S.top[5])}), 11번(${f2(S.top[10])}), 4번(${f2(S.top[3])}), 10번(${f2(S.top[9])})은 0.2 이하로, 상위권이 이미 거의 다 맞혀 최상위권을 가려내지 못합니다. 반대로 3번(${f2(S.top[2])}), 14번(${f2(S.top[13])}), 20번(${f2(S.top[19])}), 8번(${f2(S.top[7])})이 1등급 변별을 맡고 있습니다.` },
+  ex_uli: { lab: `변별도 (찍기 학생 ${S.straightN}명 제외, 27%)`, ref: [{v:.4,t:'0.40 높음'},{v:.2,t:'0.20 낮음'}],
+            note: () => `같은 번호를 15개 이상 표기한 ${S.straightN}명을 빼고(${S.ex_n}명) 다시 계산했습니다. <b>5번 ${f3(S.uli[4])} → ${f3(S.ex_uli[4])}, 9번 ${f3(S.uli[8])} → ${f3(S.ex_uli[8])}, 16번 ${f3(S.uli[15])} → ${f3(S.ex_uli[15])}</b>로 크게 오릅니다. 이 문항들의 변별도가 낮았던 큰 이유는 문항 자체보다 <b>한 번호로 찍은 하위권 학생들이 정답을 맞혔기 때문</b>입니다.` },
+};
+function ddChart() {
+  const D = S[discKey];
+  let idx = [...Array(N).keys()];
+  if (sortKey === 'diff') idx.sort((a,b) => S.difficulty[a]-S.difficulty[b]);
+  if (sortKey === 'disc') idx.sort((a,b) => D[a]-D[b]);
+  const s1 = css('--s1'), s2 = css('--s2'), surf = css('--surface');
+  const diffSet = discKey === 'ex_uli' ? S.ex_difficulty : S.difficulty;
+  const data = { labels: idx.map(i => S.items[i]), datasets: [
+    { label: '난이도', data: idx.map(i => diffSet[i]), backgroundColor: s1, borderRadius: 4, borderSkipped: 'start', borderColor: surf, borderWidth: { left: 1, right: 1 } },
+    { label: '변별도', data: idx.map(i => D[i]), backgroundColor: s2, borderRadius: 4, borderSkipped: 'start', borderColor: surf, borderWidth: { left: 1, right: 1 } },
+  ]};
+  document.getElementById('discLegend').textContent = DISC[discKey].lab;
+  document.getElementById('refLegend').textContent = '기준선 ' + DISC[discKey].ref.map(r=>r.v.toFixed(2)).join(' · ');
+  document.getElementById('discNote').innerHTML = DISC[discKey].note();
+  const o = baseOpts();
+  if (charts.dd) { charts.dd.data = data; charts.dd.options.plugins.refLines.lines = DISC[discKey].ref; charts.dd.update(); return; }
+  charts.dd = new Chart(document.getElementById('ddChart'), {
+    type: 'bar', data, plugins: [refLines],
+    options: { ...o, interaction: { mode: 'index', intersect: false },
+      plugins: { ...o.plugins, refLines: { lines: DISC[discKey].ref }, tooltip: { ...o.plugins.tooltip, callbacks: {
+        label: c => c.datasetIndex === 0 ? ` 난이도 ${f3(c.parsed.y)} · ${diffCls(c.parsed.y)[0]}` : ` ${DISC[discKey].lab.split(' (')[0]} ${f3(c.parsed.y)}${discKey==='top'?'':' · '+discCls(c.parsed.y)[0]}` } } },
+      scales: { x: { grid: { display: false } }, y: { min: 0, max: 1, grid: grid(), border: { display: false }, ticks: { stepSize: .2, callback: v => v.toFixed(1) } } } }
+  });
+}
+function seg(id, cb) {
+  const el = document.getElementById(id);
+  el.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return;
+    el.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); cb(b.dataset.k); });
+}
+
+/* ---------- item explorer ---------- */
+const THETA = Array.from({length: 121}, (_,i) => -3 + i*0.05);
+const GROUP_T = [-1.40, -0.53, 0, 0.53, 1.40]; // 표준정규분포 5분위 구간의 평균
+const GROUP_L = ['최하위','하위','중위','상위','최상위'];
+let cur = 0;
+function itemChart() {
+  const a = S.a[cur], b = S.b[cur], s1 = css('--s1'), s2 = css('--s2'), surf = css('--surface');
+  const data = { datasets: [
+    { type: 'line', label: '2모수 곡선', data: THETA.map(t => ({x:t, y: icc(t,a,b)})), borderColor: s1, borderWidth: 2, pointRadius: 0, tension: 0, fill: { target: 'origin', above: alpha(s1, .07) } },
+    { type: 'line', label: '실제 정답률', data: S.group5[cur].map((y,k) => ({x: GROUP_T[k], y, g: GROUP_L[k], n: S.groupN[k]})), showLine: false, pointRadius: 6, pointHoverRadius: 8, pointBackgroundColor: s2, pointBorderColor: surf, pointBorderWidth: 2 },
+  ]};
+  const o = baseOpts();
+  if (charts.item) { charts.item.data = data; charts.item.update(); }
+  else charts.item = new Chart(document.getElementById('itemChart'), {
+    type: 'line', data,
+    options: { ...o, interaction: { mode: 'nearest', intersect: false },
+      plugins: { ...o.plugins, tooltip: { ...o.plugins.tooltip, filter: (c) => c.datasetIndex === 1 || true, callbacks: {
+        title: i => i[0].datasetIndex === 1 ? `${i[0].raw.g} 성적대 (${i[0].raw.n}명)` : `능력 θ = ${i[0].parsed.x.toFixed(2)}`,
+        label: c => c.datasetIndex === 1 ? ` 실제 정답률 ${(c.parsed.y*100).toFixed(1)}%` : ` 예측 정답 확률 ${(c.parsed.y*100).toFixed(1)}%` } } },
+      scales: { x: { type: 'linear', min: -3, max: 3, grid: grid(), ticks: { stepSize: 1 }, title: { display: true, text: '능력 θ (점: 성적대 위치)' } },
+        y: { min: 0, max: 1, grid: grid(), border: { display: false }, ticks: { stepSize: .2, callback: v => (v*100)+'%' }, title: { display: true, text: '정답 확률' } } } }
+  });
+  document.getElementById('itemParams').innerHTML = [
+    ['난이도 (정답률 P)', f3(S.difficulty[cur]), diffCls(S.difficulty[cur])],
+    ['변별도 (상·하위 27%)', f3(S.uli[cur]), discCls(S.uli[cur])],
+    ['상위권 변별 (5 − 4)', f2(S.top[cur]), S.top[cur] <= .2 ? ['약함','b-warn'] : ['양호','b-ok']],
+    ['IRT 변별도 a', f2(a), aCls(a)],
+    ['IRT 난이도 b', f2(b), b < -0.5 ? ['쉬운 편','b-n'] : b > 0.5 ? ['어려운 편','b-warn'] : ['중간','b-ok']],
+    ['찍기 학생 정답 수', `${S.straightHit[cur]}명`, S.straightHit[cur] >= 15 ? ['많음','b-bad'] : ['적음','b-n']],
+  ].map(([l,v,c]) => `<div class="param"><div class="l">${l}</div><div class="v"><span>${v}</span>${badge(c)}</div></div>`).join('');
+  allChart();
+}
+function allChart() {
+  const s1 = css('--s1'), s2 = css('--s2'), faint = css('--faint');
+  const ds = S.items.map((it, j) => {
+    const sel = j === cur, low = S.a[j] < 0.65;
+    return { label: it, data: THETA.map(t => ({x:t, y: icc(t,S.a[j],S.b[j])})), borderColor: sel ? s1 : low ? alpha(s2, .85) : alpha(faint, .45),
+      borderWidth: sel ? 3 : low ? 2 : 1.25, pointRadius: 0, pointHoverRadius: 0, tension: 0, order: sel ? 0 : low ? 1 : 2 };
+  });
+  const o = baseOpts();
+  if (charts.all) { charts.all.data.datasets = ds; charts.all.update('none'); return; }
+  charts.all = new Chart(document.getElementById('allChart'), {
+    type: 'line', data: { datasets: ds },
+    options: { ...o, animation: false, interaction: { mode: 'nearest', intersect: false, axis: 'xy' },
+      onClick: (e, els) => { if (els.length) { cur = els[0].datasetIndex; document.getElementById('itemSel').value = cur; itemChart(); } },
+      plugins: { ...o.plugins, tooltip: { ...o.plugins.tooltip, displayColors: false, callbacks: {
+        title: i => i[0].dataset.label, label: c => ` a = ${f2(S.a[c.datasetIndex])}, b = ${f2(S.b[c.datasetIndex])} (클릭하면 선택)` } } },
+      scales: { x: { type: 'linear', min: -3, max: 3, grid: grid(), ticks: { stepSize: 1 }, title: { display: true, text: '능력 θ' } },
+        y: { min: 0, max: 1, grid: grid(), border: { display: false }, ticks: { stepSize: .2, callback: v => v.toFixed(1) }, title: { display: true, text: '정답 확률' } } } }
+  });
+}
+
+/* ---------- simulator ---------- */
+function sim() {
+  const a = +document.getElementById('sl-a').value, b = +document.getElementById('sl-b').value, c = +document.getElementById('sl-c').value;
+  document.getElementById('o-a').textContent = a.toFixed(1);
+  document.getElementById('o-b').textContent = b.toFixed(1);
+  document.getElementById('o-c').textContent = c.toFixed(2);
+  document.getElementById('o-mid').textContent = icc(b,a,b,c).toFixed(3);
+  const s1 = css('--s1'), faint = css('--faint'), s3 = css('--s3');
+  const ds = [
+    { label: '3모수', data: THETA.map(t => ({x:t,y:icc(t,a,b,c)})), borderColor: s1, borderWidth: 2.5, pointRadius: 0, fill: { target: 'origin', above: alpha(s1,.07) } },
+    { label: 'c=0', data: THETA.map(t => ({x:t,y:icc(t,a,b,0)})), borderColor: faint, borderWidth: 1.5, borderDash: [5,4], pointRadius: 0 },
+    { label: 'b', data: [{x:b,y:0},{x:b,y:1}], borderColor: alpha(s3,.6), borderWidth: 1, borderDash: [2,3], pointRadius: 0 },
+  ];
+  const o = baseOpts();
+  if (charts.sim) { charts.sim.data.datasets = ds; charts.sim.update('none'); return; }
+  charts.sim = new Chart(document.getElementById('simChart'), {
+    type: 'line', data: { datasets: ds },
+    options: { ...o, animation: false, interaction: { mode: 'index', intersect: false },
+      plugins: { ...o.plugins, tooltip: { ...o.plugins.tooltip, filter: c => c.datasetIndex < 2, callbacks: { title: i => `θ = ${i[0].parsed.x.toFixed(2)}`, label: c => ` ${c.datasetIndex ? 'c = 0' : '3모수'}: ${c.parsed.y.toFixed(3)}` } } },
+      scales: { x: { type: 'linear', min: -3, max: 3, grid: grid(), ticks: { stepSize: 1 }, title: { display: true, text: '능력 θ' } },
+        y: { min: 0, max: 1, grid: grid(), border: { display: false }, ticks: { stepSize: .2, callback: v => v.toFixed(1) }, title: { display: true, text: '정답 확률 P(θ)' } } } }
+  });
+}
+
+/* ---------- insights ---------- */
+function insights() {
+  const lowA = S.items.filter((_,j) => S.a[j] < 0.65);
+  const hard = S.items.map((it,j)=>[it,j]).filter(([_,j]) => S.difficulty[j] < 0.3).map(([it,j]) => `${it} ${f3(S.difficulty[j])}`);
+  const topWeak = S.items.map((it,j)=>[it,j]).filter(([_,j]) => S.top[j] <= .2).sort((x,y)=>S.top[x[1]]-S.top[y[1]]).map(([it,j]) => `${it} ${f2(S.top[j])}`);
+  const topStrong = S.items.map((it,j)=>[it,j]).sort((x,y)=>S.top[y[1]]-S.top[x[1]]).slice(0,4).map(([it,j]) => `${it} ${f2(S.top[j])}`);
+  const best = S.items.map((it,j)=>[it,j]).sort((x,y)=>S.a[y[1]]-S.a[x[1]]).slice(0,4).map(([it,j]) => `${it} a=${f2(S.a[j])}`);
+  const cards = [
+    ['ok', '전체적으로 잘 만든 시험', `<p class="muted">신뢰도(Cronbach α)가 <b>${f2(S.alpha)}</b>로 매우 높고, ${N}문항 중 ${S.uli.filter(d=>d>=.4).length}문항의 변별도가 0.40 이상입니다. 2모수 모형에서 변별도 a가 가장 큰 문항은 다음과 같습니다.</p><div class="chips">${best.map(x=>`<span class="chip">${x}</span>`).join('')}</div><p class="muted small">문항특성곡선이 가파르게 서 있어, 그 난이도 근처의 학생들을 날카롭게 구분합니다.</p>`],
+    ['bad', '변별력이 낮은 문항: 5번 · 9번 · 16번', `<p class="muted">세 문항은 정답률이 0.43~0.50으로 적당하지만, IRT 변별도 a가 ${lowA.map(it => `${it} ${f2(S.a[S.items.indexOf(it)])}`).join(', ')}로 ‘거의 없다~낮다’ 수준입니다. 성적대별 정답률을 보면 최하위권도 35% 안팎을 맞혀 곡선이 거의 평평합니다.</p><p class="muted small">문항특성곡선에서 바닥이 높고 완만한 곡선으로 나타나는 문항입니다. 출제 의도와 정답 위치를 함께 점검해 볼 필요가 있습니다.</p>`],
+    ['warn', `‘한 번호 찍기’ 학생 ${S.straightN}명의 영향`, `<p class="muted">응시자의 ${(S.straightN/S.n*100).toFixed(0)}%가 15문항 이상을 같은 번호로 표기했습니다. 이 학생들은 정답 번호가 같은 문항을 ‘공짜로’ 맞혀, 하위 집단 정답률을 끌어올립니다. 찍기 학생 중 정답자 수: <b>4번 ${S.straightHit[3]}명, 9번 ${S.straightHit[8]}명, 16번 ${S.straightHit[15]}명, 5번 ${S.straightHit[4]}명</b>.</p><p class="muted small">이들을 빼고 다시 계산하면 5번 변별도는 ${f3(S.uli[4])} → ${f3(S.ex_uli[4])}, 16번은 ${f3(S.uli[15])} → ${f3(S.ex_uli[15])}로 올라갑니다. 정답 번호를 문항별로 고르게 배치하는 것만으로도 변별도가 달라질 수 있고, 3모수 모형의 추측도 c가 왜 필요한지 보여 주는 사례입니다.</p>`],
+    ['', '1등급(최상위권)을 가려내는 문항은?', `<p class="muted">상위권(4)과 최상위권(5)의 정답률 차이가 0.2 이하인 문항: </p><div class="chips">${topWeak.map(x=>`<span class="chip">${x}</span>`).join('')}</div><p class="muted">이 문항들은 상위권도 대부분 맞혀 최상위권을 구분하지 못합니다. 최상위권 변별을 실제로 맡은 문항은 다음과 같습니다.</p><div class="chips">${topStrong.map(x=>`<span class="chip">${x}</span>`).join('')}</div><p class="muted small">정답률 0.3 미만의 어려운 문항(${hard.join(', ')})과 대체로 겹칩니다. 5등급제에서 상위 10%를 가르는 일은 소수의 어려운 문항이 맡고 있는 셈입니다.</p>`],
+  ];
+  document.getElementById('insights').innerHTML = cards.map(([k,t,b]) => `<div class="card insight ${k}"><h3>${t}</h3>${b}</div>`).join('') +
+    `<div class="card" style="grid-column:1/-1"><h3>수업에서 생각해 볼 질문</h3><ol class="muted" style="margin:0;padding-left:20px">
+      <li>5번·9번·16번 문항을 시험지에서 찾아보자. 내용이 쉬워서일까, 정답 위치 때문일까?</li>
+      <li>상위권 변별이 약한 1번·6번·11번은 ‘기본 개념 확인’ 문항으로서 제 역할을 한 것일까?</li>
+      <li>찍기 학생을 빼고 분석하는 것이 공정할까? 고전검사이론과 문항반응이론은 이 문제를 각각 어떻게 다룰까?</li>
+      <li>다음 시험에서 1등급을 더 안정적으로 가르려면 어떤 난이도·변별도의 문항이 몇 개 필요할까?</li>
+    </ol></div>`;
+}
+
+/* ---------- table ---------- */
+function table() {
+  const maxw = 70;
+  document.querySelector('#sumTable tbody').innerHTML = S.items.map((it,j) => `<tr>
+    <td><b>${it}</b></td><td class="num">${f3(S.difficulty[j])}</td><td>${badge(diffCls(S.difficulty[j]))}</td>
+    <td class="num"><span class="bar-mini" style="width:${Math.max(2,S.uli[j]*maxw)}px"></span>${f3(S.uli[j])}</td><td>${badge(discCls(S.uli[j]))}</td>
+    <td class="num">${f2(S.top[j])}</td><td class="num">${f2(S.rit[j])}</td><td class="num">${f2(S.a[j])}</td><td class="num">${f2(S.b[j])}</td><td>${badge(aCls(S.a[j]))}</td></tr>`).join('');
+}
+
+/* ---------- init ---------- */
+const sel = document.getElementById('itemSel');
+S.items.forEach((it,j) => sel.insertAdjacentHTML('beforeend', `<option value="${j}">${it}</option>`));
+sel.addEventListener('change', () => { cur = +sel.value; itemChart(); });
+document.getElementById('prevBtn').onclick = () => { cur = (cur+N-1)%N; sel.value = cur; itemChart(); };
+document.getElementById('nextBtn').onclick = () => { cur = (cur+1)%N; sel.value = cur; itemChart(); };
+seg('discSeg', k => { discKey = k; ddChart(); });
+seg('sortSeg', k => { sortKey = k; ddChart(); });
+['sl-a','sl-b','sl-c'].forEach(id => document.getElementById(id).addEventListener('input', sim));
+document.querySelectorAll('.presets button').forEach(b => b.addEventListener('click', () => {
+  const [a,bb,c] = b.dataset.p.split(',').map(Number);
+  document.getElementById('sl-a').value = a; document.getElementById('sl-b').value = bb; document.getElementById('sl-c').value = c; sim(); }));
+document.querySelectorAll('.copy').forEach(btn => btn.addEventListener('click', () => {
+  const txt = btn.parentElement.innerText.replace(/^복사\n?/, '').replace(/^복사됨\n?/, '');
+  navigator.clipboard?.writeText(txt).then(() => { btn.textContent = '복사됨'; setTimeout(() => btn.textContent = '복사', 1500); }); }));
+
+function renderAll() { Object.values(charts).forEach(c => c.destroy()); for (const k in charts) delete charts[k]; hist(); ddChart(); itemChart(); sim(); }
+kpis(); insights(); table(); renderAll();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
+
+/* toc highlight */
+const links = [...document.querySelectorAll('#toc a')];
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id)); }), { rootMargin: '-45% 0px -50% 0px' });
+document.querySelectorAll('section.chap').forEach(s => io.observe(s));
+</script>
+</body>
+</html>
