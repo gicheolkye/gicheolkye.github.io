@@ -115,7 +115,10 @@
   .steps li{counter-increment:st;position:relative;padding:10px 0 10px 38px;border-top:1px solid var(--line);font-size:14px}
   .steps li:first-child{border-top:none}
   .steps li::before{content:counter(st);position:absolute;left:0;top:10px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:12.5px;font-weight:700;display:grid;place-items:center}
-  .steps li b{display:block;margin-bottom:2px}
+  .steps > li > b:first-child{display:block;margin-bottom:2px}
+  .steps .sub2{margin:4px 0 0;padding-left:18px;color:var(--ink)}
+  .steps .sub2 li{counter-increment:none;padding:2px 0;border:none;list-style:disc}
+  .steps .sub2 li::before{content:none}
   .steps .row{margin-top:8px}
   textarea.code{width:100%;height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:8px;background:#fafaf8;color:#444;resize:vertical}
   .note{background:#f7f6f2;border-radius:8px;padding:10px 12px;font-size:13px;color:var(--muted);margin-top:12px}
@@ -287,7 +290,12 @@
         <li><b>조회 코드 붙여넣기</b>그 시트에서 <b>확장 프로그램 → Apps Script</b>를 열고, 원래 내용을 지운 뒤 아래 코드를 통째로 붙여넣고 저장(💾). 코드에는 이 생성기만 데이터를 올릴 수 있는 비밀 열쇠가 들어 있습니다.
           <div class="row"><button class="small primary" id="stuCopy">코드 복사</button><span class="muted" style="font-size:12.5px">복사가 안 되면 아래 칸을 눌러 전체 선택(Ctrl+A) 후 복사하세요.</span></div>
           <textarea class="code" id="stuCodeText" readonly></textarea></li>
-        <li><b>웹 앱으로 배포</b><span class="muted">(코드를 다시 붙여넣었을 때는 <b>배포 → 배포 관리 → 연필 → 버전: 새 버전 → 배포</b>. 저장만 하면 반영되지 않습니다.)</span><br>처음이면 오른쪽 위 <b>배포 → 새 배포</b> → 톱니바퀴에서 <b>웹 앱</b> → 실행 사용자 <b>나</b>, 액세스 권한 <b>모든 사용자</b> → <b>배포</b>. 권한 창이 뜨면 본인 계정으로 허용(‘확인되지 않은 앱’이 나오면 고급 → 이동).</li>
+        <li><b>웹 앱으로 배포</b>
+          <ul class="sub2">
+            <li><b>처음 배포할 때:</b> 오른쪽 위 <b>배포 → 새 배포</b> → 톱니바퀴에서 <b>웹 앱</b> 선택 → 실행 사용자 <b>나</b>, 액세스 권한 <b>모든 사용자</b> → <b>배포</b></li>
+            <li><b>코드를 다시 붙여넣었을 때:</b> <b>배포 → 배포 관리 → 연필(수정) → 버전: 새 버전 → 배포</b> (저장만 하면 반영되지 않습니다. 주소는 그대로)</li>
+            <li class="muted">권한 창이 뜨면 본인 계정으로 허용하세요. ‘확인되지 않은 앱’이 나오면 <b>고급 → 이동</b>을 누르면 됩니다.</li>
+          </ul></li>
         <li><b>주소 넣기</b>배포 후 나온 <b>웹 앱 URL</b>을 위 칸에 붙여넣고 <b>학생 조회 페이지에 올리기</b>. 같은 주소를 학생들에게 안내하면 됩니다.</li>
       </ol>
       <div class="row" style="margin-top:6px"><span class="muted" style="font-size:12.5px">자동 올리기가 안 되는 환경이면:</span><button class="small" id="stuXlsx">조회용 시트 파일 받기</button><span class="muted" style="font-size:12.5px">→ 시트에서 파일 → 가져오기 → ‘스프레드시트 바꾸기’</span></div>
