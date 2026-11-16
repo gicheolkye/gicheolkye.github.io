@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시험 시간표 조회</title>
+<style>
+  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f5f1;color:#1d2321;font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+  .box{text-align:center;padding:28px 22px;max-width:360px}
+  h1{font-size:19px;margin:0 0 8px;color:#1f5c4a}
+  p{font-size:14.5px;color:#68706c;margin:6px 0;line-height:1.6}
+  a{color:#1f5c4a;font-weight:700}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#1f5c4a;margin:0 3px;animation:b 1s infinite alternate}
+  .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+  @keyframes b{from{opacity:.25}to{opacity:1}}
+</style>
+</head>
+<body>
+<div class="box" id="box">
+  <h1>시험 시간표 조회</h1>
+  <p><span class="dot"></span><span class="dot"></span><span class="dot"></span></p>
+  <p>조회 페이지로 이동하고 있어요…</p>
+</div>
+<script>
+// 이 페이지는 짧은 주소입니다. 실제 조회 페이지 주소는 target.json에 있고,
+// 시험 시간표 생성기(examseat)의 '학생 조회' 탭이 자동으로 갱신합니다.
+fetch('target.json?t=' + Date.now(), { cache: 'no-store' })
+  .then(r => r.ok ? r.json() : null)
+  .then(d => {
+    if (d && /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec/.test(d.url || '')) { location.replace(d.url); return; }
+    throw new Error('no target');
+  })
+  .catch(() => {
+    document.getElementById('box').innerHTML = '<h1>시험 시간표 조회</h1><p>아직 조회 페이지가 열리지 않았어요.</p><p>담임 선생님 안내를 기다려 주세요.</p>';
+  });
+</script>
+</body>
+</html>
