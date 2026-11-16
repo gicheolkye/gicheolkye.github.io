@@ -183,10 +183,17 @@
     <div data-p="tt">
       <div class="row">
         <select id="ttGrade"></select>
+        <select id="ttClass"></select>
         <input type="search" id="ttSearch" placeholder="학번 또는 이름 검색" style="width:200px">
         <label class="muted" style="font-size:13px"><input type="checkbox" id="ttOnlyHl"> 대기가 필요한 학생만</label>
         <span class="spacer"></span>
         <span class="muted" id="ttCount" style="font-size:13px"></span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span class="muted" style="font-size:13px">반별로 받기:</span>
+        <button class="small" id="clsOne">이 반 엑셀</button>
+        <button class="small primary" id="clsZip">반별 엑셀 묶음 (ZIP)</button>
+        <button class="small" id="clsBook">반별 시트 한 파일</button>
       </div>
       <div class="scroll" style="margin-top:10px"><table class="grid" id="ttTable"></table></div>
       <div class="legend"><span><i></i>미응시인데 그날 뒤에 볼 시험이 남은 칸(1교시 미응시·시험 사이 미응시) — 대기 장소가 필요한 학생</span></div>
@@ -566,6 +573,68 @@
     return S(places[grade + '|' + period + '|' + cls]) || S(places[grade + '|' + period]) || '';
   }
 
+  // 개인 시간표 시트 (rowIdx: 넣을 행 번호 목록, null이면 전체 / title: 맨 위 제목 줄)
+  const XL = {
+    border: (() => { const t = { style: 'thin', color: { argb: 'FFBFBFBF' } }; return { top: t, left: t, bottom: t, right: t }; })(),
+    head: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEA' } },
+    yellow: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } },
+  };
+  const numIfNum = v => (typeof v === 'string' && /^\d+$/.test(v) && v.length < 6 && !/^0\d/.test(v)) ? Number(v) : v;
+  function addTimetableSheet(wb, name, g, rowIdx, waitPlaces, title) {
+    const t = g.timetable;
+    const ws = wb.addWorksheet(name.slice(0, 31), { pageSetup: { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 } } });
+    const ncol = t.rows[0].length;
+    let off = 0;
+    if (title) {
+      ws.addRow([title]); ws.mergeCells(1, 1, 1, ncol);
+      const c1 = ws.getCell(1, 1); c1.font = { bold: true, size: 15 }; c1.alignment = { horizontal: 'center', vertical: 'middle' };
+      ws.getRow(1).height = 30; off = 1;
+    }
+    const idx = rowIdx || t.rows.map((_, i) => i).slice(1);
+    ws.addRow(t.rows[0]);
+    idx.forEach(r => ws.addRow(t.rows[r].map((v, j) => j < 3 ? numIfNum(v) : v)));
+    ws.columns.forEach((col, i) => { col.width = i === 0 ? 6 : i === 1 ? 9 : i === 2 ? 10 : 19; });
+    const iId = t.rows[0].map(S).indexOf('학번');
+    ws.eachRow((row, rn) => {
+      if (rn <= off) return;
+      const hr = rn === off + 1, src = hr ? 0 : idx[rn - off - 2];
+      if (!hr) row.height = 48;
+      row.eachCell({ includeEmpty: true }, (cell, cn) => {
+        cell.border = XL.border;
+        cell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'center' };
+        if (hr) { cell.font = { bold: true }; cell.fill = XL.head; }
+        else if (t.highlights.has(src + ',' + (cn - 1))) {
+          cell.fill = XL.yellow;
+          const id = S(t.rows[src][iId]);
+          const place = waitPlaceFor(waitPlaces, g.grade, S(t.rows[0][cn - 1]), parseInt(id.slice(1, 3), 10) || 0);
+          if (place) cell.value = '*미응시\n대기: ' + place;
+        }
+      });
+    });
+    ws.views = [{ state: 'frozen', xSplit: 3, ySplit: off + 1 }];
+    ws.pageSetup.printTitlesRow = `${off + 1}:${off + 1}`;
+    return ws;
+  }
+  function classRows(g) {   // 반 번호 → 행 번호 목록
+    const t = g.timetable, iId = t.rows[0].map(S).indexOf('학번'), out = new Map();
+    for (let r = 1; r < t.rows.length; r++) {
+      const cls = parseInt(S(t.rows[r][iId]).slice(1, 3), 10) || 0;
+      if (!out.has(cls)) out.set(cls, []);
+      out.get(cls).push(r);
+    }
+    return new Map([...out].sort((a, b) => a[0] - b[0]));
+  }
+  // 반별 개인 시간표 엑셀: classes = [반 번호...]
+  async function buildClassWorkbook(ExcelJS, g, classes, waitPlaces, titleFn) {
+    const wb = new ExcelJS.Workbook();
+    const map = classRows(g);
+    for (const cls of classes) {
+      if (!map.has(cls)) continue;
+      addTimetableSheet(wb, `${g.grade}학년 ${cls}반`, g, map.get(cls), waitPlaces, titleFn ? titleFn(g.grade, cls) : `${g.grade}학년 ${cls}반 개인별 시험 시간표`);
+    }
+    return wb.xlsx.writeBuffer();
+  }
+
   // 결과 엑셀 (ExcelJS)
   async function buildWorkbook(ExcelJS, res) {
     const wb = new ExcelJS.Workbook();
@@ -587,27 +656,7 @@
     for (const g of res.grades) {
       if (g.course) addSimple(g.grade + '학년 강좌목록', g.course.rows, [6, 8, 22, 14, 9, 7, 7, 16, 16, 8]);
       if (g.roster) addSimple(g.grade + '학년 고사실별 명렬표', g.roster.rows, [7, 6, 8, 6, 9, 13, 9, 10, 20, 9, 9]);
-      if (g.timetable) {
-        const t = g.timetable;
-        const ws = wb.addWorksheet((g.grade + '학년 개인 시간표').slice(0, 31));
-        t.rows.forEach((r, i) => ws.addRow(i === 0 ? r : r.map((v, j) => j < 3 ? numIfNum(v) : v)));
-        ws.columns.forEach((col, i) => { col.width = i === 0 ? 6 : i === 1 ? 9 : i === 2 ? 10 : 19; });
-        ws.eachRow((row, rn) => {
-          if (rn > 1) row.height = 48;
-          row.eachCell({ includeEmpty: true }, (cell, cn) => {
-            cell.border = border;
-            cell.alignment = { wrapText: true, vertical: 'middle', horizontal: 'center' };
-            if (rn === 1) { cell.font = { bold: true }; cell.fill = headFill; }
-            else if (t.highlights.has((rn - 1) + ',' + (cn - 1))) {
-              cell.fill = yellow;
-              const id = S(t.rows[rn - 1][1]);
-              const place = waitPlaceFor(res.waitPlaces, g.grade, S(t.rows[0][cn - 1]), parseInt(id.slice(1, 3), 10) || 0);
-              if (place) cell.value = '*미응시\n대기: ' + place;
-            }
-          });
-        });
-        ws.views = [{ state: 'frozen', xSplit: 3, ySplit: 1 }];
-      }
+      if (g.timetable) addTimetableSheet(wb, g.grade + '학년 개인 시간표', g, null, res.waitPlaces, null);
     }
     const waits = waitList(res.grades);
     if (waits.length) {
@@ -650,7 +699,7 @@
     return wb.xlsx.writeBuffer();
   }
 
-  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor };
+  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook };
   if (typeof module !== 'undefined') module.exports = root.ExamCore;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -852,6 +901,7 @@ function renderResult(keepView) {
   const sel = $('#ttGrade');
   sel.innerHTML = R.grades.filter(g => g.timetable).map(g => `<option value="${g.grade}">${g.grade}학년 개인 시간표</option>`).join('');
   if (keepView && prevGrade) sel.value = prevGrade;
+  fillClassSelect();
   renderTT();
   renderSummary();
   $('#seatPeriod').innerHTML = R.periods.map(p => `<option value="${p}" ${R.conflicts[p] ? 'style="color:#a4461d"' : ''}>${periodLabel(p)}${R.conflicts[p] ? ' ⚠' : ''}</option>`).join('');
@@ -873,13 +923,51 @@ $('#tabs').addEventListener('click', e => {
 });
 
 // ---------- 개인 시간표 미리보기 ----------
-['#ttGrade', '#ttSearch', '#ttOnlyHl'].forEach(s => $(s).addEventListener('input', renderTT));
+['#ttSearch', '#ttOnlyHl', '#ttClass'].forEach(s => $(s).addEventListener('input', renderTT));
+$('#ttGrade').addEventListener('input', () => { fillClassSelect(); renderTT(); });
+const curGrade = () => result && result.grades.find(x => x.grade == $('#ttGrade').value && x.timetable);
+function fillClassSelect() {
+  const g = curGrade(), sel = $('#ttClass'), prev = sel.value;
+  if (!g) { sel.innerHTML = ''; return; }
+  const map = C.classRows(g);
+  sel.innerHTML = '<option value="">전체 반</option>' + [...map].map(([c, rows]) => `<option value="${c}">${c}반 (${rows.length}명)</option>`).join('');
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+}
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const clsTitle = (grade, cls) => {
+  const base = (envCfg.title || '').replace(/\{학년\}학년\s*/, '').replace(/\{학년\}/g, grade).trim();
+  return `${base ? base + ' ' : ''}${grade}학년 ${cls}반 개인별 시험 시간표`;
+};
+$('#clsOne').addEventListener('click', async () => {
+  const g = curGrade(); if (!g) return;
+  const cls = Number($('#ttClass').value);
+  if (!cls) { toast('위에서 반을 먼저 골라 주세요. (전체를 받으려면 묶음 버튼)'); $('#ttClass').focus(); return; }
+  busy(true, '엑셀 만드는 중…');
+  try { const buf = await C.buildClassWorkbook(ExcelJS, g, [cls], waitPlaces, clsTitle); busy(false); await saveFile(`개인시간표_${g.grade}학년_${cls}반.xlsx`, new Blob([buf], { type: XLSX_MIME })); }
+  catch (e) { busy(false); toast('엑셀 오류: ' + e.message); }
+});
+$('#clsZip').addEventListener('click', async () => {
+  const g = curGrade(); if (!g) return;
+  busy(true, '반별 엑셀 만드는 중…');
+  try {
+    const zip = new JSZip();
+    for (const cls of C.classRows(g).keys()) zip.file(`개인시간표_${g.grade}학년_${cls}반.xlsx`, await C.buildClassWorkbook(ExcelJS, g, [cls], waitPlaces, clsTitle));
+    const out = await zip.generateAsync({ type: 'blob' }); busy(false);
+    await saveFile(`개인시간표_${g.grade}학년_반별.zip`, out);
+  } catch (e) { busy(false); toast('ZIP 오류: ' + e.message); }
+});
+$('#clsBook').addEventListener('click', async () => {
+  const g = curGrade(); if (!g) return;
+  busy(true, '엑셀 만드는 중…');
+  try { const buf = await C.buildClassWorkbook(ExcelJS, g, [...C.classRows(g).keys()], waitPlaces, clsTitle); busy(false); await saveFile(`개인시간표_${g.grade}학년_반별시트.xlsx`, new Blob([buf], { type: XLSX_MIME })); }
+  catch (e) { busy(false); toast('엑셀 오류: ' + e.message); }
+});
 function renderTT() {
   const g = result.grades.find(x => x.grade == $('#ttGrade').value);
   const tbl = $('#ttTable');
   if (!g) { tbl.innerHTML = ''; return; }
   const t = g.timetable, h = t.rows[0];
-  const q = $('#ttSearch').value.trim(), only = $('#ttOnlyHl').checked;
+  const q = $('#ttSearch').value.trim(), only = $('#ttOnlyHl').checked, clsF = Number($('#ttClass').value) || 0;
   const iId = h.indexOf('학번'), iNm = h.indexOf('이름');
   const lefts = [0, 54, 128], widths = [54, 74, 80];
   let html = '<thead><tr>' + h.map((x, i) => `<th class="${i < 3 ? 's' : ''}" style="${i < 3 ? `left:${lefts[i]}px;min-width:${widths[i]}px;max-width:${widths[i]}px` : 'min-width:118px'}">${esc(x)}</th>`).join('') + '</tr></thead><tbody>';
@@ -887,6 +975,7 @@ function renderTT() {
   for (let r = 1; r < t.rows.length; r++) {
     const row = t.rows[r];
     if (q && !(S(row[iId]).includes(q) || S(row[iNm]).includes(q))) continue;
+    if (clsF && parseInt(S(row[iId]).slice(1, 3), 10) !== clsF) continue;
     if (only && !t.dataCols.some(c => t.highlights.has(r + ',' + c))) continue;
     n++;
     html += '<tr>' + row.map((v, c) => {
