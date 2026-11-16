@@ -1,12 +1,13 @@
 /**
  * 시험 시간표 학생 조회 — Google Apps Script (코드 파일 하나로 끝)
  *
- * 쓰는 법
- *  1) 시험 시간표 생성기에서 받은 '학생조회용_시간표.xlsx'를 구글 시트로 가져오기
- *     (파일 > 가져오기 > 업로드 > '스프레드시트 바꾸기')
- *  2) 그 시트에서 [확장 프로그램 > Apps Script]를 열고, 이 코드를 통째로 붙여넣고 저장
- *  3) [배포 > 새 배포 > 유형: 웹 앱] → 실행 사용자: 나 / 액세스 권한: 모든 사용자 → 배포
- *  4) 나온 웹 앱 주소를 학생들에게 안내
+ * 처음 한 번
+ *  1) 빈 구글 시트에서 [확장 프로그램 > Apps Script]를 열고 이 코드를 통째로 붙여넣고 저장
+ *  2) [배포 > 새 배포 > 유형: 웹 앱] → 실행 사용자: 나 / 액세스 권한: 모든 사용자 → 배포
+ *  3) 나온 웹 앱 주소를 시험 시간표 생성기의 '학생 조회' 탭에 붙여넣기
+ * 그다음부터
+ *  - 생성기에서 [학생 조회 페이지에 올리기] 버튼만 누르면 시트가 자동으로 바뀝니다.
+ *  - 같은 웹 앱 주소를 학생들에게 계속 안내하면 됩니다.
  *
  *  - 학생은 학번·이름(확인코드를 쓰면 확인코드까지)이 모두 맞아야 '자기 것만' 볼 수 있습니다.
  *  - 시트 자체는 공유하지 않으므로 학생이 다른 학생 정보를 열람할 수 없습니다.
@@ -14,6 +15,7 @@
  *  - 다음 시험 때는 1)처럼 새 파일로 '스프레드시트 바꾸기'만 하면 같은 주소로 계속 쓸 수 있습니다.
  */
 
+var UPLOAD_KEY = '__UPLOAD_KEY__';   // 생성기만 데이터를 올릴 수 있게 하는 비밀 열쇠 (생성기가 자동으로 넣음)
 var MAX_FAIL = 5;      // 같은 학번으로 이만큼 틀리면
 var LOCK_MIN = 10;     // 이 시간(분) 동안 조회 막기
 
@@ -27,6 +29,43 @@ function doGet() {
   return HtmlService.createHtmlOutput(html)
     .setTitle(cfg.title)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/** 생성기에서 시간표 올리기 (POST, 본문은 JSON 텍스트) */
+function doPost(e) {
+  var out = function (o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); };
+  var lock = LockService.getScriptLock();
+  try {
+    var d = JSON.parse(e.postData.contents);
+    if (!UPLOAD_KEY || UPLOAD_KEY.indexOf('__') === 0 || d.key !== UPLOAD_KEY) return out({ ok: false, msg: '올리기 열쇠가 맞지 않습니다. 생성기의 코드를 다시 붙여넣었는지 확인하세요.' });
+    if (d.action === 'ping') return out({ ok: true, msg: '연결되었습니다.', students: Math.max(0, (SpreadsheetApp.getActive().getSheetByName('시간표') || { getLastRow: function () { return 1; } }).getLastRow() - 1) });
+    lock.waitLock(20000);
+    var ss = SpreadsheetApp.getActive();
+    writeSheet_(ss, '설정', [['항목', '값', '설명'], ['제목', d.title || '시험 시간표 조회', '조회 페이지 맨 위 제목'], ['안내', d.notice || '', '제목 아래 안내 문구'], ['공개', d.open === false ? 'N' : 'Y', 'N으로 바꾸면 조회가 바로 막힙니다'], ['올린 시각', Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm'), '생성기에서 마지막으로 올린 시각']]);
+    writeSheet_(ss, '시간표', [d.header].concat(d.rows));
+    if (d.codeRows && d.codeRows.length) writeSheet_(ss, '확인코드(담임 배부용)', [['학년', '반', '학번', '이름', '확인코드']].concat(d.codeRows));
+    else { var cs = ss.getSheetByName('확인코드(담임 배부용)'); if (cs) ss.deleteSheet(cs); }
+    ['시트1', 'Sheet1'].forEach(function (n) { var s = ss.getSheetByName(n); if (s && ss.getSheets().length > 1 && s.getLastRow() === 0) ss.deleteSheet(s); });
+    return out({ ok: true, msg: d.rows.length + '명의 시간표를 올렸습니다.', students: d.rows.length });
+  } catch (err) {
+    return out({ ok: false, msg: '올리는 중 오류: ' + err.message });
+  } finally {
+    try { lock.releaseLock(); } catch (e2) {}
+  }
+}
+
+function writeSheet_(ss, name, rows) {
+  var sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  sh.clear();
+  if (!rows.length) return;
+  var w = 0; rows.forEach(function (r) { w = Math.max(w, r.length); });
+  var data = rows.map(function (r) { var x = r.map(function (v) { return v === null || v === undefined ? '' : String(v); }); while (x.length < w) x.push(''); return x; });
+  var rg = sh.getRange(1, 1, data.length, w);
+  rg.setNumberFormat('@');
+  rg.setValues(data);
+  rg.setWrap(true).setVerticalAlignment('top');
+  sh.getRange(1, 1, 1, w).setFontWeight('bold');
+  sh.setFrozenRows(1);
 }
 
 function readConfig_() {
