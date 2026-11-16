@@ -111,6 +111,14 @@
   .envCfg{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center;font-size:13.5px;margin-bottom:14px}
   .envCfg input{font:inherit;font-size:13.5px;padding:5px 8px;border:1px solid #cfd3cf;border-radius:6px;width:100%;max-width:420px}
   table.wait input.sm{max-width:90px}
+  .steps{margin:0;padding-left:0;list-style:none;counter-reset:st}
+  .steps li{counter-increment:st;position:relative;padding:10px 0 10px 38px;border-top:1px solid var(--line);font-size:14px}
+  .steps li:first-child{border-top:none}
+  .steps li::before{content:counter(st);position:absolute;left:0;top:10px;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:12.5px;font-weight:700;display:grid;place-items:center}
+  .steps li b{display:block;margin-bottom:2px}
+  .steps .row{margin-top:8px}
+  textarea.code{width:100%;height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:8px;background:#fafaf8;color:#444;resize:vertical}
+  .note{background:#f7f6f2;border-radius:8px;padding:10px 12px;font-size:13px;color:var(--muted);margin-top:12px}
   .envs{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-top:14px}
   .envs .room canvas{border:1px solid var(--line)}
   .hidden{display:none!important}
@@ -178,6 +186,7 @@
       <button data-t="wait">대기 장소</button>
       <button data-t="seat">좌석표</button>
       <button data-t="env">시험지 봉투</button>
+      <button data-t="stu">학생 조회</button>
     </div>
 
     <div data-p="tt">
@@ -200,7 +209,7 @@
     </div>
 
     <div data-p="sum" class="hidden">
-      <p class="sub" style="margin-bottom:10px">명렬표 기준, 날짜별로 각 고사실에서 치르는 과목과 인원입니다. 맨 아래는 날짜별 과목 합계입니다.</p>
+      <p class="sub" style="margin-bottom:10px">개인 시간표 기준, 날짜별로 각 고사실에서 치르는 과목과 인원입니다. 자기 반 교실에서 보는 시험(예: 2학년 1반)은 그 반 교실 번호(201) 칸에 들어갑니다. 맨 아래는 날짜별 과목 합계입니다.</p>
       <div class="scroll"><table class="grid" id="sumTable"></table></div>
     </div>
 
@@ -246,6 +255,29 @@
         <button id="envAllPdf">전체 봉투 PDF 한 파일</button>
       </div>
       <div class="envs" id="envs"></div>
+    </div>
+
+    <div data-p="stu" class="hidden">
+      <p class="sub" style="margin-bottom:12px">학생이 휴대폰으로 학번·이름을 넣으면 <b>자기 시간표만</b> 보는 페이지를 선생님 구글 계정에 만듭니다. 학생 정보는 선생님 구글 시트에만 있고, 시트는 공유하지 않으므로 다른 학생 것은 볼 수 없습니다. 처음 한 번만 설정하면 다음 시험부터는 3번 시트만 바꾸면 같은 주소로 계속 쓸 수 있습니다.</p>
+      <div class="envCfg">
+        <label for="stuTitle">페이지 제목</label><input type="text" id="stuTitle">
+        <label for="stuNotice">안내 문구</label><input type="text" id="stuNotice">
+        <label>본인 확인</label>
+        <div><label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" id="stuCode" style="width:auto"> 학번·이름에 더해 학생별 4자리 <b>확인코드</b>도 받기</label>
+        <div class="muted" style="font-size:12px;margin-top:3px">켜면 시트에 '확인코드(담임 배부용)' 명단이 함께 들어갑니다. 담임 선생님이 학생에게 나눠 주세요. 번호는 이 브라우저에 기억되어 다음에 만들어도 같습니다.</div></div>
+      </div>
+      <ol class="steps">
+        <li><b>조회용 시트 파일 받기</b>지금 변환한 시간표(바꾼 고사실·대기 장소 포함)로 만든 엑셀입니다.
+          <div class="row"><button class="small primary" id="stuXlsx">학생조회용_시간표.xlsx 받기</button></div></li>
+        <li><b>구글 시트 만들기 (처음 한 번)</b>Google Drive에서 <b>새로 만들기 → Google 스프레드시트</b>로 빈 시트를 만들고 이름을 정해 주세요(예: 시험 시간표 조회). <span class="muted">학생에게 이 시트는 공유하지 마세요.</span></li>
+        <li><b>파일 가져오기</b>그 시트에서 <b>파일 → 가져오기 → 업로드</b>로 1번 파일을 올리고, 위치를 <b>‘스프레드시트 바꾸기’</b>로 고른 뒤 <b>데이터 가져오기</b>. 다음 시험 때도 이 단계만 다시 하면 됩니다.</li>
+        <li><b>조회 코드 붙여넣기 (처음 한 번)</b><b style="display:inline">확장 프로그램 → Apps Script</b>를 열고, 원래 있던 내용을 지운 뒤 아래 코드를 통째로 붙여넣고 저장(💾)합니다.
+          <div class="row"><button class="small primary" id="stuCopy">코드 복사</button><span class="muted" style="font-size:12.5px">복사가 안 되면 아래 칸을 눌러 전체 선택(Ctrl+A) 후 복사하세요.</span></div>
+          <textarea class="code" id="stuCodeText" readonly></textarea></li>
+        <li><b>웹 앱으로 배포 (처음 한 번)</b>오른쪽 위 <b>배포 → 새 배포</b> → 톱니바퀴에서 <b>웹 앱</b> 선택 → 실행 사용자 <b>나</b>, 액세스 권한 <b>모든 사용자</b> → <b>배포</b>. 권한 승인 창이 뜨면 본인 계정으로 허용하세요(‘확인되지 않은 앱’이 나오면 고급 → 이동).</li>
+        <li><b>학생들에게 주소 안내</b>배포 후 나온 <b>웹 앱 URL</b>을 리로스쿨 공지나 학급 단체방에 올리면 됩니다. 조회를 닫으려면 시트의 <b>설정</b> 탭에서 공개를 <b>N</b>으로 바꾸세요.</li>
+      </ol>
+      <div class="note">학번과 이름은 친구끼리 서로 알 수 있으니, 다른 학생 것을 볼 수 없게 하려면 확인코드를 켜세요. 같은 학번으로 5번 틀리면 10분 동안 조회가 막힙니다. 학교 구글 워크스페이스 계정이라면 5번에서 액세스 권한을 ‘○○고 내 모든 사용자’로 하면 학교 계정으로 로그인한 사람만 들어올 수 있습니다.</div>
     </div>
   </section>
 </main>
@@ -475,6 +507,29 @@
     return { dates: D, rooms: R, grid, totals };
   }
 
+  // 5-1) 개인 시간표 기준 현황 레코드 (이동수업 + 자기 반 교실 시험 모두)
+  //      "208 / 01" → 208,  "2학년 1반" → 201 (반 교실 번호)
+  function timetableRecords(grades) {
+    const recs = [];
+    for (const g of grades) {
+      const t = g.timetable; if (!t) continue;
+      const h = t.rows[0].map(S);
+      for (let r = 1; r < t.rows.length; r++) {
+        for (const c of t.dataCols) {
+          const v = S(t.rows[r][c]); if (!v || v.includes('미응시')) continue;
+          const L = v.split('\n'); if (L.length < 3) continue;
+          const subj = L[0].trim(), loc = L[2].trim();
+          let room = null, m;
+          if ((m = /^(.*?)\s*\/\s*\d+\s*$/.exec(loc))) room = m[1].trim();
+          else if ((m = /([1-3])\s*학년\s*(\d+)\s*반/.exec(loc))) room = m[1] + String(parseInt(m[2], 10)).padStart(2, '0');
+          if (!room) continue;
+          recs.push({ date: h[c].slice(0, 5), period: h[c].replace(/^.*\)/, ''), subj, room });
+        }
+      }
+    }
+    return recs;
+  }
+
   // 6) 좌석표 데이터 (seat_period.py generate_images)
   function seatData(timetables, colName) {
     const rooms = new Map();
@@ -635,6 +690,63 @@
     return wb.xlsx.writeBuffer();
   }
 
+  // 학생 조회용 시트 (구글 시트로 가져가 Apps Script로 조회)
+  const periodLabelC = p => String(p).replace(/^(.*\))\s*(\d+)$/, '$1 $2교시');
+  const roomLabelC = r => /^[1-3]\d{2}$/.test(r) ? `${r[0]}학년 ${parseInt(r.slice(1), 10)}반 교실` : r;
+  function studentCellText(g, r, c, waitPlaces) {
+    const t = g.timetable, v = S(t.rows[r][c]);
+    const id = S(t.rows[r][t.rows[0].map(S).indexOf('학번')]);
+    if (!v) return '';
+    if (v.includes('미응시')) {
+      if (!t.highlights.has(r + ',' + c)) return '미응시';
+      const place = waitPlaceFor(waitPlaces, g.grade, S(t.rows[0][c]), parseInt(id.slice(1, 3), 10) || 0);
+      return '미응시\n' + (place ? '대기 장소: ' + place : '대기 장소는 담임 선생님께 확인하세요');
+    }
+    const L = v.split('\n'); const subj = L[0] || '', loc = L[2] || '';
+    const m = /^(.*?)\s*\/\s*(\d+)\s*$/.exec(loc);
+    if (m) return `${subj}\n고사실: ${roomLabelC(m[1].trim())}${/^[1-3]\d{2}$/.test(m[1].trim()) ? ` (${m[1].trim()}호)` : ''}\n좌석 ${parseInt(m[2], 10)}번`;
+    if (/학년\s*\d+반/.test(loc)) return `${subj}\n고사실: 우리 반 교실 (${loc})\n좌석 ${parseInt(id.slice(-2), 10)}번 (출석번호)`;
+    return `${subj}\n${loc}`;
+  }
+  async function buildStudentBook(ExcelJS, res, opts) {
+    const wb = new ExcelJS.Workbook();
+    const cfg = wb.addWorksheet('설정');
+    cfg.addRow(['항목', '값', '설명']);
+    cfg.addRow(['제목', opts.title || '시험 시간표 조회', '조회 페이지 맨 위 제목']);
+    cfg.addRow(['안내', opts.notice || '', '제목 아래 안내 문구']);
+    cfg.addRow(['공개', 'Y', 'N으로 바꾸면 조회가 바로 막힙니다']);
+    cfg.columns = [{ width: 10 }, { width: 60 }, { width: 34 }];
+    cfg.getRow(1).font = { bold: true };
+    const ws = wb.addWorksheet('시간표');
+    const periods = [...new Set(res.grades.filter(g => g.timetable).flatMap(g => g.timetable.dataCols.map(c => S(g.timetable.rows[0][c]))))].sort();
+    ws.addRow(['학번', '이름', '확인코드'].concat(periods.map(periodLabelC)));
+    const codeRows = [];
+    for (const g of res.grades) {
+      const t = g.timetable; if (!t) continue;
+      const h = t.rows[0].map(S), iId = h.indexOf('학번'), iNm = h.indexOf('이름');
+      for (let r = 1; r < t.rows.length; r++) {
+        const id = S(t.rows[r][iId]), code = opts.codes ? (opts.codes[id] || '') : '';
+        ws.addRow([id, S(t.rows[r][iNm]), code].concat(periods.map(p => { const c = h.indexOf(p); return c < 0 ? '' : studentCellText(g, r, c, res.waitPlaces); })));
+        if (code) codeRows.push([g.grade, parseInt(id.slice(1, 3), 10) || 0, id, S(t.rows[r][iNm]), code]);
+      }
+    }
+    ws.getColumn(1).numFmt = '@'; ws.getColumn(3).numFmt = '@';
+    ws.eachRow((row, rn) => { row.eachCell(cell => { cell.alignment = { wrapText: true, vertical: 'top' }; if (rn === 1) cell.font = { bold: true }; }); });
+    ws.columns.forEach((col, i) => { col.width = i < 3 ? 10 : 24; });
+    ws.views = [{ state: 'frozen', xSplit: 2, ySplit: 1 }];
+    if (codeRows.length) {
+      const cs = wb.addWorksheet('확인코드(담임 배부용)', { pageSetup: { paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+      cs.addRow(['학년', '반', '학번', '이름', '확인코드']);
+      codeRows.sort((a, b) => a[2].localeCompare(b[2])).forEach(r => cs.addRow(r));
+      cs.getColumn(5).numFmt = '@';
+      cs.columns.forEach((col, i) => { col.width = [7, 6, 10, 12, 12][i]; });
+      cs.eachRow((row, rn) => row.eachCell(cell => { cell.border = XL.border; cell.alignment = { horizontal: 'center' }; if (rn === 1) { cell.font = { bold: true }; cell.fill = XL.head; } }));
+      cs.autoFilter = { from: 'A1', to: 'E1' };
+      cs.pageSetup.printTitlesRow = '1:1';
+    }
+    return wb.xlsx.writeBuffer();
+  }
+
   // 결과 엑셀 (ExcelJS)
   async function buildWorkbook(ExcelJS, res) {
     const wb = new ExcelJS.Workbook();
@@ -699,7 +811,7 @@
     return wb.xlsx.writeBuffer();
   }
 
-  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook };
+  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, timetableRecords, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook, buildStudentBook, studentCellText };
   if (typeof module !== 'undefined') module.exports = root.ExamCore;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -867,8 +979,9 @@ function run(keepView) {
     grades.push(out);
   }
   const applied = C.applyRoomOverrides(grades, overrides);
-  const allRecords = grades.flatMap(g => g.roster ? g.roster.records : []);
-  const summary = C.buildSummary(allRecords);
+  // 현황: 개인 시간표 기준(자기 반 교실 시험 포함). 시간표가 없으면 명렬표 기준
+  const ttRecs = C.timetableRecords(grades);
+  const summary = C.buildSummary(ttRecs.length ? ttRecs : grades.flatMap(g => g.roster ? g.roster.records : []));
   const tts = grades.filter(g => g.timetable).map(g => g.timetable);
   const periods = [...new Set(tts.flatMap(t => t.dataCols.map(c => S(t.rows[0][c]))))].sort();
   // 고사실 좌석 겹침 검사
@@ -1343,6 +1456,49 @@ $('#envZip').addEventListener('click', async () => {
     busy(false);
     await saveFile('시험지봉투_과목별.zip', out);
   } catch (e) { busy(false); toast('ZIP 오류: ' + e.message); }
+});
+
+// ---------- 학생 조회 ----------
+const GAS_CODE = "/**\n * 시험 시간표 학생 조회 — Google Apps Script (코드 파일 하나로 끝)\n *\n * 쓰는 법\n *  1) 시험 시간표 생성기에서 받은 '학생조회용_시간표.xlsx'를 구글 시트로 가져오기\n *     (파일 > 가져오기 > 업로드 > '스프레드시트 바꾸기')\n *  2) 그 시트에서 [확장 프로그램 > Apps Script]를 열고, 이 코드를 통째로 붙여넣고 저장\n *  3) [배포 > 새 배포 > 유형: 웹 앱] → 실행 사용자: 나 / 액세스 권한: 모든 사용자 → 배포\n *  4) 나온 웹 앱 주소를 학생들에게 안내\n *\n *  - 학생은 학번·이름(확인코드를 쓰면 확인코드까지)이 모두 맞아야 '자기 것만' 볼 수 있습니다.\n *  - 시트 자체는 공유하지 않으므로 학생이 다른 학생 정보를 열람할 수 없습니다.\n *  - '설정' 시트의 공개 값을 N으로 바꾸면 바로 조회가 막힙니다.\n *  - 다음 시험 때는 1)처럼 새 파일로 '스프레드시트 바꾸기'만 하면 같은 주소로 계속 쓸 수 있습니다.\n */\n\nvar MAX_FAIL = 5;      // 같은 학번으로 이만큼 틀리면\nvar LOCK_MIN = 10;     // 이 시간(분) 동안 조회 막기\n\nfunction doGet() {\n  var cfg = readConfig_();\n  var html = PAGE_HTML\n    .replace(/__TITLE__/g, esc_(cfg.title))\n    .replace('__NOTICE__', esc_(cfg.notice).replace(/\\n/g, '<br>'))\n    .replace('__USECODE__', usesCode_() ? '1' : '0')\n    .replace('__OPEN__', cfg.open ? '1' : '0');\n  return HtmlService.createHtmlOutput(html)\n    .setTitle(cfg.title)\n    .addMetaTag('viewport', 'width=device-width, initial-scale=1');\n}\n\nfunction readConfig_() {\n  var cfg = { title: '시험 시간표 조회', notice: '', open: true };\n  var sh = SpreadsheetApp.getActive().getSheetByName('설정');\n  if (!sh) return cfg;\n  sh.getDataRange().getDisplayValues().forEach(function (r) {\n    var k = String(r[0]).trim(), v = String(r[1] || '').trim();\n    if (k === '제목' && v) cfg.title = v;\n    if (k === '안내') cfg.notice = v;\n    if (k === '공개') cfg.open = !/^(n|no|아니오|x|비공개)$/i.test(v);\n  });\n  return cfg;\n}\n\nfunction table_() {\n  var sh = SpreadsheetApp.getActive().getSheetByName('시간표');\n  if (!sh) throw new Error(\"'시간표' 시트를 찾을 수 없습니다.\");\n  var v = sh.getDataRange().getDisplayValues();\n  var h = v[0].map(function (x) { return String(x).trim(); });\n  return { values: v, h: h, iId: h.indexOf('학번'), iNm: h.indexOf('이름'), iCd: h.indexOf('확인코드') };\n}\n\nfunction usesCode_() {\n  try {\n    var t = table_();\n    if (t.iCd < 0) return false;\n    for (var r = 1; r < t.values.length; r++) if (String(t.values[r][t.iCd]).trim()) return true;\n  } catch (e) {}\n  return false;\n}\n\n/** 페이지에서 google.script.run.lookup(학번, 이름, 확인코드)로 부름 */\nfunction lookup(id, name, code) {\n  id = String(id || '').replace(/\\D/g, '');\n  name = String(name || '').replace(/\\s/g, '');\n  code = String(code || '').replace(/\\s/g, '');\n  if (!readConfig_().open) return { ok: false, msg: '지금은 시간표 조회 기간이 아닙니다.' };\n  if (!/^\\d{5}$/.test(id)) return { ok: false, msg: '학번 5자리를 입력해 주세요.' };\n  if (!name) return { ok: false, msg: '이름을 입력해 주세요.' };\n\n  var cache = CacheService.getScriptCache(), fk = 'fail_' + id;\n  var fails = Number(cache.get(fk) || 0);\n  if (fails >= MAX_FAIL) return { ok: false, msg: '입력이 여러 번 틀려서 ' + LOCK_MIN + '분 동안 조회할 수 없습니다. 잠시 뒤 다시 해 보세요.' };\n\n  var t = table_(), row = null;\n  for (var r = 1; r < t.values.length; r++) {\n    if (String(t.values[r][t.iId]).replace(/\\D/g, '') === id) { row = t.values[r]; break; }\n  }\n  var need = t.iCd >= 0 && row && String(row[t.iCd]).trim() !== '';\n  var bad = !row || String(row[t.iNm]).replace(/\\s/g, '') !== name || (need && String(row[t.iCd]).trim() !== code);\n  if (bad) {\n    cache.put(fk, String(fails + 1), LOCK_MIN * 60);\n    Utilities.sleep(700);\n    return { ok: false, msg: '입력한 정보와 일치하는 학생이 없습니다. 학번·이름' + (usesCode_() ? '·확인코드' : '') + '를 다시 확인해 주세요.' };\n  }\n  cache.remove(fk);\n  var first = Math.max(t.iId, t.iNm, t.iCd) + 1, items = [];\n  for (var c = first; c < t.h.length; c++) if (t.h[c]) items.push({ period: t.h[c], text: String(row[c] || '') });\n  return { ok: true, id: id, name: String(row[t.iNm]), items: items };\n}\n\nfunction esc_(s) {\n  return String(s).replace(/[&<>\"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' }[c]; });\n}\n\nvar PAGE_HTML = '<!DOCTYPE html>\\n<html lang=\"ko\"><head><meta charset=\"utf-8\"><base target=\"_top\">\\n' +\n'<style>\\n' +\n':root{--ac:#1f5c4a;--soft:#e6efe9;--ink:#1d2321;--mu:#68706c;--line:#e2e0d9;--hl:#fff36b}\\n' +\n'*{box-sizing:border-box}body{margin:0;background:#f6f5f1;color:var(--ink);font-family:\"Noto Sans KR\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",system-ui,sans-serif;font-size:16px;line-height:1.5}\\n' +\n'header{background:var(--ac);color:#fff;padding:22px 18px 18px}header h1{margin:0;font-size:20px;letter-spacing:-.3px}header p{margin:6px 0 0;font-size:13.5px;opacity:.85}\\n' +\n'main{max-width:560px;margin:0 auto;padding:16px}\\n' +\n'.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}\\n' +\n'label{display:block;font-size:13.5px;color:var(--mu);margin:10px 0 4px}\\n' +\n'input{width:100%;font:inherit;padding:11px 12px;border:1px solid #cfd3cf;border-radius:8px;font-size:17px}\\n' +\n'button{width:100%;margin-top:14px;font:inherit;font-weight:700;font-size:16px;padding:12px;border:none;border-radius:8px;background:var(--ac);color:#fff}\\n' +\n'button:disabled{opacity:.6}\\n' +\n'.msg{margin-top:10px;color:#a4461d;font-size:14px;min-height:1em}\\n' +\n'.who{display:flex;justify-content:space-between;align-items:baseline}.who b{font-size:19px}.who a{font-size:13.5px;color:var(--ac)}\\n' +\n'.day h2{font-size:15px;margin:0 0 8px;color:var(--ac)}\\n' +\n'.p{display:flex;gap:12px;padding:10px 0;border-top:1px solid var(--line)}.p:first-of-type{border-top:none}\\n' +\n'.p .no{flex:0 0 52px;font-weight:700;color:var(--mu);font-size:14px;padding-top:2px}\\n' +\n'.p .s{font-weight:700;font-size:17px}.p .r{font-size:14.5px}.p .seat{font-size:14.5px;color:var(--ac);font-weight:700}\\n' +\n'.p.miss .s{color:#a3a39c;font-weight:400;font-size:15px}\\n' +\n'.p.wait{background:var(--hl);margin:0 -16px;padding:10px 16px}.p.wait .s{color:var(--ink);font-weight:700}\\n' +\n'.closed{text-align:center;color:var(--mu);padding:30px 10px}\\n' +\n'.foot{font-size:12.5px;color:var(--mu);text-align:center;margin-top:8px}\\n' +\n'<\/style><\/head><body>\\n' +\n'<header><h1>__TITLE__<\/h1><p>__NOTICE__<\/p><\/header>\\n' +\n'<main>\\n' +\n'<div class=\"card\" id=\"form\">\\n' +\n'  <label for=\"id\">학번 (5자리)<\/label><input id=\"id\" inputmode=\"numeric\" maxlength=\"5\" autocomplete=\"off\" placeholder=\"예: 20101\">\\n' +\n'  <label for=\"nm\">이름<\/label><input id=\"nm\" autocomplete=\"off\" placeholder=\"예: 홍길동\">\\n' +\n'  <div id=\"cdBox\" style=\"display:none\"><label for=\"cd\">확인코드 (담임 선생님께 받은 4자리)<\/label><input id=\"cd\" inputmode=\"numeric\" maxlength=\"8\" autocomplete=\"off\"><\/div>\\n' +\n'  <button id=\"go\">내 시간표 보기<\/button>\\n' +\n'  <div class=\"msg\" id=\"msg\"><\/div>\\n' +\n'<\/div>\\n' +\n'<div id=\"out\"><\/div>\\n' +\n'<p class=\"foot\">입력한 정보는 시간표 확인에만 쓰이고 저장되지 않습니다.<\/p>\\n' +\n'<\/main>\\n' +\n'<script>\\n' +\n'var USECODE = \"__USECODE__\" === \"1\", OPEN = \"__OPEN__\" === \"1\";\\n' +\n'function $(s){return document.getElementById(s);}\\n' +\n'function esc(s){return String(s).replace(/[&<>\"]/g,function(c){return {\"&\":\"&amp;\",\"<\":\"&lt;\",\">\":\"&gt;\",\"\\\\\"\":\"&quot;\"}[c];});}\\n' +\n'if (USECODE) $(\"cdBox\").style.display = \"block\";\\n' +\n'if (!OPEN) { $(\"form\").innerHTML = \"<div class=closed>지금은 시간표 조회 기간이 아닙니다.<\/div>\"; }\\n' +\n'function go(){\\n' +\n'  var b=$(\"go\"); b.disabled=true; b.textContent=\"찾는 중…\"; $(\"msg\").textContent=\"\";\\n' +\n'  google.script.run.withSuccessHandler(function(res){\\n' +\n'    b.disabled=false; b.textContent=\"내 시간표 보기\";\\n' +\n'    if(!res.ok){ $(\"msg\").textContent=res.msg; return; }\\n' +\n'    show(res);\\n' +\n'  }).withFailureHandler(function(e){ b.disabled=false; b.textContent=\"내 시간표 보기\"; $(\"msg\").textContent=\"잠시 후 다시 시도해 주세요.\"; }).lookup($(\"id\").value,$(\"nm\").value,USECODE?$(\"cd\").value:\"\");\\n' +\n'}\\n' +\n'function show(res){\\n' +\n'  var days=[], map={};\\n' +\n'  res.items.forEach(function(it){ var sp=it.period.indexOf(\" \"); var d=sp>0?it.period.slice(0,sp):it.period, p=sp>0?it.period.slice(sp+1):\"\";\\n' +\n'    if(!map[d]){map[d]=[];days.push(d);} map[d].push({p:p,t:it.text}); });\\n' +\n'  var h=\"<div class=card><div class=who><b>\"+esc(res.id)+\" \"+esc(res.name)+\"<\/b><a href=\\\\\"#\\\\\" onclick=\\\\\"reset();return false;\\\\\">다른 학생 조회<\/a><\/div><\/div>\";\\n' +\n'  days.forEach(function(d){\\n' +\n'    h+=\"<div class=\\\\\"card day\\\\\"><h2>\"+esc(d)+\"<\/h2>\";\\n' +\n'    map[d].forEach(function(x){\\n' +\n'      var L=x.t.split(\"\\\\n\"), cls=\"p\", body=\"\";\\n' +\n'      if(L[0].indexOf(\"미응시\")>=0){\\n' +\n'        if(L[1]){ cls+=\" wait\"; body=\"<div class=s>응시 과목 없음 · 학교에서 대기<\/div><div class=r>\"+esc(L[1])+\"<\/div>\"; }\\n' +\n'        else { cls+=\" miss\"; body=\"<div class=s>응시 과목 없음<\/div>\"; }\\n' +\n'      } else if(L[0]) {\\n' +\n'        body=\"<div class=s>\"+esc(L[0])+\"<\/div>\"+(L[1]?\"<div class=r>\"+esc(L[1])+\"<\/div>\":\"\")+(L[2]?\"<div class=seat>\"+esc(L[2])+\"<\/div>\":\"\");\\n' +\n'      } else { cls+=\" miss\"; body=\"<div class=s>-<\/div>\"; }\\n' +\n'      h+=\"<div class=\\\\\"\"+cls+\"\\\\\"><div class=no>\"+esc(x.p)+\"<\/div><div>\"+body+\"<\/div><\/div>\";\\n' +\n'    });\\n' +\n'    h+=\"<\/div>\";\\n' +\n'  });\\n' +\n'  $(\"form\").style.display=\"none\"; $(\"out\").innerHTML=h; window.scrollTo(0,0);\\n' +\n'}\\n' +\n'function reset(){ $(\"out\").innerHTML=\"\"; $(\"form\").style.display=\"block\"; $(\"id\").value=\"\"; $(\"nm\").value=\"\"; if($(\"cd\"))$(\"cd\").value=\"\"; $(\"id\").focus(); }\\n' +\n'$(\"go\").onclick=go;\\n' +\n'[\"id\",\"nm\",\"cd\"].forEach(function(k){ var e=$(k); if(e) e.addEventListener(\"keydown\",function(ev){ if(ev.key===\"Enter\") go(); }); });\\n' +\n'<\/script><\/body><\/html>';\n";
+let stuCfg = { title: '', notice: '', useCode: false, codes: {} };
+try { stuCfg = Object.assign(stuCfg, JSON.parse(localStorage.getItem('examseat.stu') || '{}')); } catch (e) {}
+const saveStu = () => { try { localStorage.setItem('examseat.stu', JSON.stringify(stuCfg)); } catch (e) {} };
+if (!stuCfg.title) stuCfg.title = (envCfg.title || '').replace(/\{학년\}학년\s*/, '').trim() + ' 시간표 조회';
+if (!stuCfg.notice) stuCfg.notice = '학번과 이름을 넣으면 내 시험 시간표와 고사실·좌석을 볼 수 있어요. 고사실이 바뀔 수 있으니 시험 전날 한 번 더 확인하세요.';
+$('#stuTitle').value = stuCfg.title; $('#stuNotice').value = stuCfg.notice; $('#stuCode').checked = !!stuCfg.useCode;
+$('#stuTitle').addEventListener('input', e => { stuCfg.title = e.target.value; saveStu(); });
+$('#stuNotice').addEventListener('input', e => { stuCfg.notice = e.target.value; saveStu(); });
+$('#stuCode').addEventListener('change', e => { stuCfg.useCode = e.target.checked; saveStu(); });
+$('#stuCodeText').value = GAS_CODE;
+$('#stuCodeText').addEventListener('focus', e => e.target.select());
+$('#stuCopy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(GAS_CODE); toast('코드를 복사했습니다. Apps Script에 붙여넣으세요.'); }
+  catch (e) { const ta = $('#stuCodeText'); ta.focus(); ta.select(); toast('자동 복사가 막혀 있어 코드를 선택해 두었습니다. Ctrl+C로 복사하세요.', 4000); }
+});
+function ensureCodes() {
+  const used = new Set(Object.values(stuCfg.codes));
+  for (const g of result.grades) {
+    const t = g.timetable; if (!t) continue;
+    const iId = t.rows[0].map(S).indexOf('학번');
+    for (let r = 1; r < t.rows.length; r++) {
+      const id = S(t.rows[r][iId]);
+      if (!id || stuCfg.codes[id]) continue;
+      let code;
+      do { const a = new Uint32Array(1); crypto.getRandomValues(a); code = String(1000 + a[0] % 9000); } while (used.has(code));
+      used.add(code); stuCfg.codes[id] = code;
+    }
+  }
+  saveStu();
+}
+$('#stuXlsx').addEventListener('click', async () => {
+  if (!result) return;
+  busy(true, '조회용 시트 만드는 중…');
+  try {
+    if (stuCfg.useCode) ensureCodes();
+    const buf = await C.buildStudentBook(ExcelJS, result, { title: stuCfg.title, notice: stuCfg.notice, codes: stuCfg.useCode ? stuCfg.codes : null });
+    busy(false);
+    await saveFile('학생조회용_시간표.xlsx', new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+  } catch (e) { busy(false); toast('파일 오류: ' + e.message); }
 });
 
 // ---------- 고사실 현황 ----------
