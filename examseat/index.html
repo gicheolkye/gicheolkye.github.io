@@ -108,6 +108,11 @@
   .linkbtn{border:none;background:none;color:var(--accent);padding:2px 4px;font-size:13px;text-decoration:underline;text-underline-offset:3px}
   table.grid td.hl small{display:block;font-size:11.5px;color:#6b5a00}
   table.grid td.hl small.none{color:#a4461d}
+  .envCfg{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center;font-size:13.5px;margin-bottom:14px}
+  .envCfg input{font:inherit;font-size:13.5px;padding:5px 8px;border:1px solid #cfd3cf;border-radius:6px;width:100%;max-width:420px}
+  table.wait input.sm{max-width:90px}
+  .envs{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-top:14px}
+  .envs .room canvas{border:1px solid var(--line)}
   .hidden{display:none!important}
   #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d2321;color:#fff;padding:10px 18px;border-radius:8px;font-size:13.5px;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:90vw}
   #toast.show{opacity:1}
@@ -172,6 +177,7 @@
       <button data-t="sum">고사실별 현황</button>
       <button data-t="wait">대기 장소</button>
       <button data-t="seat">좌석표</button>
+      <button data-t="env">시험지 봉투</button>
     </div>
 
     <div data-p="tt">
@@ -213,6 +219,23 @@
       </div>
       <div class="ovr hidden" id="ovr"></div>
       <div class="rooms" id="rooms"></div>
+    </div>
+
+    <div data-p="env" class="hidden">
+      <p class="sub" style="margin-bottom:12px">교시 · 고사장 · 과목마다 봉투 표지를 한 장씩(A4 가로) 만듭니다. 응시 인원과 좌석·학번·성명은 자동으로 채워지고, <b>과목코드·문제면수</b>는 과목마다 한 번만 적으면 됩니다. 담당교사는 강좌목록의 지도교사로 미리 채워 두었습니다.</p>
+      <div class="envCfg">
+        <label for="envTitle">봉투 제목</label>
+        <div><input type="text" id="envTitle"> <div class="muted" style="font-size:12px;margin-top:3px">{학년} 자리에 각 봉투의 학년이 들어갑니다.</div></div>
+      </div>
+      <div class="scroll" style="max-height:420px"><table class="wait" id="envSubj"></table></div>
+      <div class="row" style="margin-top:16px">
+        <select id="envPeriod"></select>
+        <span class="muted" id="envInfo" style="font-size:13px"></span>
+        <span class="spacer"></span>
+        <button id="envPdf">이 교시 봉투 PDF</button>
+        <button id="envAllPdf" class="primary">전체 봉투 PDF</button>
+      </div>
+      <div class="envs" id="envs"></div>
     </div>
   </section>
 </main>
@@ -834,6 +857,7 @@ function renderResult(keepView) {
   renderSeats();
   renderOverrides();
   renderWait();
+  renderEnvTab(keepView);
   if (!keepView) $('#resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -946,6 +970,234 @@ $('#waitAllBtn').addEventListener('click', () => {
   saveWaits(); renderWait(); renderTT();
   toast(n ? `${n}개 교시에 “${v}”을(를) 넣었습니다.` : '비어 있는 교시가 없습니다.');
 });
+
+// ---------- 시험지 봉투 ----------
+let envCfg = { title: '', subj: {} };
+try { envCfg = Object.assign(envCfg, JSON.parse(localStorage.getItem('examseat.env') || '{}')); } catch (e) {}
+const saveEnv = () => { try { localStorage.setItem('examseat.env', JSON.stringify(envCfg)); } catch (e) {} };
+(function defaultTitle() {
+  if (envCfg.title) return;
+  const d = new Date(), m = d.getMonth() + 1;
+  const year = m <= 2 ? d.getFullYear() - 1 : d.getFullYear();
+  const sem = (m >= 8 || m <= 2) ? 2 : 1;
+  const kind = (m === 4 || m === 5 || m === 9 || m === 10) ? '중간고사' : '기말고사';
+  envCfg.title = `${year}학년도 ${sem}학기 {학년}학년 ${kind}`;
+})();
+$('#envTitle').value = envCfg.title;
+$('#envTitle').addEventListener('input', () => { envCfg.title = $('#envTitle').value; saveEnv(); envCache.clear(); renderEnvPreview(); });
+
+const examHall = room => {
+  let m = /^([1-3])(\d{2})$/.exec(room); if (m) return `${m[1]} - ${parseInt(m[2], 10)}`;
+  m = /([1-3])\s*학년\s*(\d+)\s*반/.exec(room); if (m) return `${m[1]} - ${parseInt(m[2], 10)}`;
+  return room;
+};
+function teacherMap() {  // 'grade|과목' → '김○○, 이○○'
+  const out = {};
+  for (const g of result.grades) {
+    if (!g.course) continue;
+    const h = g.course.rows[0], iT = h.indexOf('지도교사'), iS = h.indexOf('과목분리');
+    if (iT < 0 || iS < 0) continue;
+    const set = {};
+    g.course.rows.slice(1).forEach(r => {
+      const subj = S(r[iS]); if (!subj) return;
+      (set[subj] = set[subj] || new Set());
+      S(r[iT]).split(/[,，、\s]+/).filter(Boolean).forEach(t => set[subj].add(t));
+    });
+    for (const k in set) out[g.grade + '|' + k] = [...set[k]].join(', ');
+  }
+  return out;
+}
+// 봉투 목록: 교시 → 고사장 → 과목
+function envelopes(period) {
+  const data = C.seatData(result.tts, period), out = [];
+  for (const room of [...data.keys()].sort(roomSort)) {
+    const bySubj = {};
+    data.get(room).forEach(s => (bySubj[s.subject] = bySubj[s.subject] || []).push(s));
+    for (const subj of Object.keys(bySubj).sort((a, b) => a.localeCompare(b, 'ko'))) {
+      const list = bySubj[subj].slice().sort((a, b) => a.seat - b.seat);
+      const gcnt = {}; list.forEach(s => gcnt[s.id[0]] = (gcnt[s.id[0]] || 0) + 1);
+      const grade = Number(Object.entries(gcnt).sort((a, b) => b[1] - a[1])[0][0]);
+      out.push({ period, room, subject: subj, grade, list });
+    }
+  }
+  return out;
+}
+let tMap = {};
+function subjInfo(grade, subj) {
+  const k = grade + '|' + subj, c = envCfg.subj[k] || {};
+  return { code: c.code || '', pages: c.pages || '', teacher: c.teacher !== undefined ? c.teacher : (tMap[k] || '') };
+}
+function renderEnvTab(keepView) {
+  tMap = teacherMap();
+  // 과목 목록
+  const agg = new Map();
+  for (const p of result.periods) for (const e of envelopes(p)) {
+    const k = e.grade + '|' + e.subject;
+    if (!agg.has(k)) agg.set(k, { grade: e.grade, subject: e.subject, envs: 0, n: 0, periods: new Set() });
+    const a = agg.get(k); a.envs++; a.n += e.list.length; a.periods.add(periodLabel(p));
+  }
+  const rows = [...agg.values()].sort((a, b) => a.grade - b.grade || [...a.periods][0].localeCompare([...b.periods][0]) || a.subject.localeCompare(b.subject, 'ko'));
+  $('#envSubj').innerHTML = '<thead><tr><th>학년</th><th>과목</th><th>시험 교시</th><th>봉투</th><th>과목코드</th><th>문제면수</th><th>담당교사</th></tr></thead><tbody>' +
+    rows.map(a => { const k = a.grade + '|' + a.subject, inf = subjInfo(a.grade, a.subject); return `<tr data-k="${esc(k)}">
+      <td>${a.grade}학년</td><td><b>${esc(a.subject)}</b></td><td class="muted">${esc([...a.periods].join(', '))}</td><td>${a.envs}장 · ${a.n}명</td>
+      <td><input type="text" class="sm" data-f="code" value="${esc(inf.code)}" placeholder="예: 1234"></td>
+      <td><input type="text" class="sm" data-f="pages" value="${esc(inf.pages)}" placeholder="쪽 수" inputmode="numeric"></td>
+      <td><input type="text" data-f="teacher" value="${esc(inf.teacher)}" placeholder="담당교사"></td></tr>`; }).join('') + '</tbody>';
+  $('#envSubj').querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
+    const k = inp.closest('tr').dataset.k;
+    envCfg.subj[k] = Object.assign(envCfg.subj[k] || {}, { [inp.dataset.f]: inp.value.trim() });
+    saveEnv(); envCache.clear(); clearTimeout(renderEnvTab._t); renderEnvTab._t = setTimeout(renderEnvPreview, 400);
+  }));
+  const prev = $('#envPeriod').value;
+  $('#envPeriod').innerHTML = result.periods.map(p => `<option value="${p}">${periodLabel(p)}</option>`).join('');
+  if (keepView && result.periods.includes(prev)) $('#envPeriod').value = prev;
+  envCache.clear();
+  renderEnvPreview();
+}
+$('#envPeriod').addEventListener('change', renderEnvPreview);
+
+const envCache = new Map();
+function fitFont(x, text, weight, size, maxW) {
+  let s = size;
+  x.font = `${weight} ${s}px ${FONT}`;
+  while (s > 8 && x.measureText(text).width > maxW) { s -= 2; x.font = `${weight} ${s}px ${FONT}`; }
+  return s;
+}
+function drawEnvelope(e) {
+  const k = mm => mm * 7.875;                 // A4 가로 297×210mm, 200dpi
+  const W = Math.round(k(297)), H = Math.round(k(210));
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const x = cv.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0, 0, W, H);
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#000'; x.strokeStyle = '#000';
+  const L = 16, R = 281, T = 20, B = 194, titleH = 16.5, leftLab = 37, leftVal = 95;
+  const xLab = L, xVal = L + leftLab, xRight = L + leftLab + leftVal;
+  // 바깥 이중선
+  x.lineWidth = k(0.5); x.strokeRect(k(L - 1.2), k(T - 1.2), k(R - L + 2.4), k(B - T + 2.4));
+  x.lineWidth = k(0.35); x.strokeRect(k(L), k(T), k(R - L), k(B - T));
+  // 제목
+  x.fillStyle = '#d9d9d9'; x.fillRect(k(L), k(T), k(R - L), k(titleH)); x.fillStyle = '#000';
+  x.beginPath(); x.moveTo(k(L), k(T + titleH)); x.lineTo(k(R), k(T + titleH)); x.stroke();
+  const title = (envCfg.title || '').replace(/\{학년\}/g, e.grade);
+  fitFont(x, title, 700, k(9.5), k(R - L - 10));
+  x.fillText(title, k((L + R) / 2), k(T + titleH / 2 + 0.4));
+  // 왼쪽 5칸
+  const top = T + titleH, rowH = (B - top) / 5;
+  x.lineWidth = k(0.3);
+  [[xVal, top, xVal, B], [xRight, top, xRight, B]].forEach(([a, b, c, d]) => { x.beginPath(); x.moveTo(k(a), k(b)); x.lineTo(k(c), k(d)); x.stroke(); });
+  for (let i = 1; i < 5; i++) { x.beginPath(); x.moveTo(k(L), k(top + i * rowH)); x.lineTo(k(xRight), k(top + i * rowH)); x.stroke(); }
+  const inf = subjInfo(e.grade, e.subject);
+  const labels = ['고 사 장', '과      목', '문제면수', '응시예정', '담당교사'];
+  labels.forEach((t, i) => { x.font = `700 ${k(6)}px ${FONT}`; x.fillText(t, k(xLab + leftLab / 2), k(top + rowH * (i + 0.5))); });
+  const cx = k(xVal + leftVal / 2), cy = i => k(top + rowH * (i + 0.5));
+  // 고사장
+  fitFont(x, examHall(e.room), 800, k(17), k(leftVal - 8)); x.fillText(examHall(e.room), cx, cy(0) + k(0.8));
+  // 과목명 [과목코드]
+  const codeTxt = inf.code ? ` [${inf.code}]` : '';
+  let fs = k(8);
+  const measure = () => { x.font = `700 ${fs}px ${FONT}`; const a = x.measureText(e.subject).width; x.font = `700 ${fs * 0.72}px ${FONT}`; return a + x.measureText(codeTxt).width; };
+  while (fs > k(3) && measure() > k(leftVal - 8)) fs -= k(0.3);
+  x.font = `700 ${fs}px ${FONT}`; const w1 = x.measureText(e.subject).width;
+  x.font = `700 ${fs * 0.72}px ${FONT}`; const w2 = x.measureText(codeTxt).width;
+  const sx = cx - (w1 + w2) / 2;
+  x.textAlign = 'left'; x.font = `700 ${fs}px ${FONT}`; x.fillText(e.subject, sx, cy(1));
+  x.font = `700 ${fs * 0.72}px ${FONT}`; x.fillText(codeTxt, sx + w1, cy(1) + fs * 0.06); x.textAlign = 'center';
+  // 문제면수 / 응시예정 : "○ 쪽"
+  const numUnit = (i, num, unit) => {
+    x.font = `700 ${k(11)}px ${FONT}`;
+    const uw = x.measureText(unit).width, gap = k(4), nb = k(18);
+    const total = nb + gap + uw, x0 = cx - total / 2;
+    if (num !== '') { x.fillText(String(num), x0 + nb / 2, cy(i) + k(0.6)); }
+    else { x.lineWidth = k(0.6); x.beginPath(); x.arc(x0 + nb / 2, cy(i), k(5.2), 0, Math.PI * 2); x.stroke(); x.lineWidth = k(0.3); }
+    x.textAlign = 'left'; x.fillText(unit, x0 + nb + gap, cy(i) + k(0.6)); x.textAlign = 'center';
+  };
+  numUnit(2, inf.pages, '쪽');
+  numUnit(3, e.list.length, '명');
+  // 담당교사
+  if (inf.teacher) { fitFont(x, inf.teacher, 500, k(7), k(leftVal - 8)); x.fillText(inf.teacher, cx, cy(4) + k(0.4)); }
+  // 오른쪽: 응시생 정보
+  const rx0 = xRight, rx1 = R, tblL = rx0 + 5.5, tblR = rx1 - 5.5;
+  x.font = `700 ${k(5.5)}px ${FONT}`; x.fillText('응시생 정보', k((rx0 + rx1) / 2), k(top + 6));
+  const maxSeat = Math.max(36, ...e.list.map(s => s.seat || 0));
+  const half = Math.ceil(maxSeat / 2);
+  const tblT = top + 11.5, headH = 11, noteH = 12;
+  const rowh = Math.min(6.6, (B - noteH - tblT - headH) / half);
+  const colW = [(tblR - tblL) / 2 * 0.22, (tblR - tblL) / 2 * 0.39, (tblR - tblL) / 2 * 0.39];
+  const tblB = tblT + headH + rowh * half;
+  x.fillStyle = '#f2f2f2'; x.fillRect(k(tblL), k(tblT), k(tblR - tblL), k(headH)); x.fillStyle = '#000';
+  x.lineWidth = k(0.25); x.strokeRect(k(tblL), k(tblT), k(tblR - tblL), k(tblB - tblT));
+  for (let i = 0; i <= half; i++) { const yy = tblT + headH + i * rowh; x.beginPath(); x.moveTo(k(tblL), k(yy)); x.lineTo(k(tblR), k(yy)); x.stroke(); }
+  const colXs = []; let cxp = tblL;
+  for (let h = 0; h < 2; h++) for (let c = 0; c < 3; c++) { colXs.push(cxp); cxp += colW[c]; }
+  colXs.forEach((xx, i) => { if (i === 0) return; x.lineWidth = k(i === 3 ? 0.6 : 0.25); x.beginPath(); x.moveTo(k(xx), k(tblT)); x.lineTo(k(xx), k(tblB)); x.stroke(); });
+  x.lineWidth = k(0.25);
+  const heads = ['좌석\n번호', '학번', '성명'];
+  for (let h = 0; h < 2; h++) heads.forEach((t, c) => {
+    const xx = colXs[h * 3 + c] + colW[c] / 2, lines = t.split('\n');
+    x.font = `400 ${k(lines.length > 1 ? 3.4 : 3.9)}px ${FONT}`;
+    lines.forEach((ln, j) => x.fillText(ln, k(xx), k(tblT + headH / 2 + (j - (lines.length - 1) / 2) * 4)));
+  });
+  const bySeat = new Map(); e.list.forEach(s => bySeat.set(s.seat, s));
+  for (let n = 1; n <= half * 2; n++) {
+    const h = n <= half ? 0 : 1, r = (n - 1) % half, yy = k(tblT + headH + rowh * (r + 0.5) + 0.2);
+    x.font = `400 ${k(3.9)}px ${FONT}`; x.fillText(String(n).padStart(2, '0'), k(colXs[h * 3] + colW[0] / 2), yy);
+    const s = bySeat.get(n);
+    if (s) {
+      x.font = `400 ${k(3.9)}px ${FONT}`; x.fillText(s.id, k(colXs[h * 3 + 1] + colW[1] / 2), yy);
+      fitFont(x, s.name, 500, k(3.9), k(colW[2] - 2)); x.fillText(s.name, k(colXs[h * 3 + 2] + colW[2] / 2), yy);
+    }
+  }
+  const extra = e.list.filter(s => !(s.seat >= 1 && s.seat <= half * 2));
+  x.textAlign = 'left'; x.fillStyle = '#e00000'; x.font = `700 ${k(3.6)}px ${FONT}`;
+  x.fillText('※ 별도고사실 응시 예정 인원 포함 작성', k(tblL - 1), k(tblB + 3.6));
+  x.fillText('※ 위탁과정 학생 제외', k(tblL - 1), k(tblB + 8.2));
+  if (extra.length) { x.fillText('좌석번호 없음: ' + extra.map(s => s.id + ' ' + s.name).join(', '), k(tblL + 70), k(tblB + 3.6), k(tblR - tblL - 70)); }
+  x.fillStyle = '#000'; x.textAlign = 'center';
+  return cv;
+}
+function envCanvas(e) {
+  const key = e.period + '|' + e.room + '|' + e.subject;
+  if (!envCache.has(key)) envCache.set(key, drawEnvelope(e));
+  return envCache.get(key);
+}
+async function renderEnvPreview() {
+  const p = $('#envPeriod').value, box = $('#envs');
+  if (!p) { box.innerHTML = ''; return; }
+  try { await document.fonts.load(`700 20px "Noto Sans KR"`); await document.fonts.load(`800 20px "Noto Sans KR"`); } catch (e) {}
+  const list = envelopes(p);
+  $('#envInfo').textContent = `${list.length}장 · ${list.reduce((a, e) => a + e.list.length, 0)}명`;
+  box.innerHTML = '';
+  list.forEach(e => {
+    const d = document.createElement('div'); d.className = 'room';
+    const cv = envCanvas(e); d.appendChild(cv);
+    d.insertAdjacentHTML('beforeend', `<div class="row"><b>${esc(examHall(e.room))}</b><span class="meta">${esc(e.subject)} · ${e.list.length}명</span></div>`);
+    cv.addEventListener('click', () => { const z = $('#zoom'); z.querySelector('img').src = cv.toDataURL(); z.classList.remove('hidden'); });
+    box.appendChild(d);
+  });
+}
+async function envPdf(periods) {
+  const { jsPDF } = window.jspdf;
+  await document.fonts.load(`700 20px "Noto Sans KR"`); await document.fonts.load(`800 20px "Noto Sans KR"`);
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  let n = 0;
+  for (const p of periods) for (const e of envelopes(p)) {
+    if (n++) pdf.addPage('a4', 'landscape');
+    const cv = envCanvas(e);
+    pdf.addImage(cv, 'PNG', 0, 0, 297, 210, undefined, 'FAST');
+  }
+  return n ? pdf.output('blob') : null;
+}
+async function envPdfSave(periods, name) {
+  busy(true, '봉투 PDF 만드는 중…');
+  await new Promise(r => setTimeout(r, 40));
+  let blob = null;
+  try { blob = await envPdf(periods); } catch (e) { busy(false); toast('PDF 오류: ' + e.message); return; }
+  busy(false);
+  if (!blob) { toast('만들 봉투가 없습니다.'); return; }
+  await saveFile(name, blob);
+}
+$('#envPdf').addEventListener('click', () => { const p = $('#envPeriod').value; if (p) envPdfSave([p], `시험지봉투_${fileSafe(periodLabel(p))}.pdf`); });
+$('#envAllPdf').addEventListener('click', () => envPdfSave(result.periods, '시험지봉투_전체.pdf'));
 
 // ---------- 고사실 현황 ----------
 function renderSummary() {
