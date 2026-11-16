@@ -224,6 +224,8 @@
     <div data-p="env" class="hidden">
       <p class="sub" style="margin-bottom:12px">교시 · 고사장 · 과목마다 봉투 표지를 한 장씩(A4 가로) 만듭니다. 응시 인원과 좌석·학번·성명은 자동으로 채워지고, <b>과목코드·문제면수</b>는 과목마다 한 번만 적으면 됩니다. 담당교사는 강좌목록의 지도교사로 미리 채워 두었습니다.</p>
       <div class="envCfg">
+        <label>인쇄 방식</label>
+        <div><select id="envLayout"><option value="2up">A4 세로에 2개씩 (모아찍기)</option><option value="1up">A4 가로에 1개씩</option></select></div>
         <label for="envTitle">봉투 제목</label>
         <div><input type="text" id="envTitle"> <div class="muted" style="font-size:12px;margin-top:3px">{학년} 자리에 각 봉투의 학년이 들어갑니다.</div></div>
       </div>
@@ -232,8 +234,9 @@
         <select id="envPeriod"></select>
         <span class="muted" id="envInfo" style="font-size:13px"></span>
         <span class="spacer"></span>
-        <button id="envPdf">이 교시 봉투 PDF</button>
-        <button id="envAllPdf" class="primary">전체 봉투 PDF</button>
+        <button id="envPdf">보고 있는 봉투 PDF</button>
+        <button id="envZip" class="primary">과목별 PDF 묶음 (ZIP)</button>
+        <button id="envAllPdf">전체 봉투 PDF 한 파일</button>
       </div>
       <div class="envs" id="envs"></div>
     </div>
@@ -984,6 +987,8 @@ const saveEnv = () => { try { localStorage.setItem('examseat.env', JSON.stringif
   envCfg.title = `${year}학년도 ${sem}학기 {학년}학년 ${kind}`;
 })();
 $('#envTitle').value = envCfg.title;
+$('#envLayout').value = envCfg.layout || '2up';
+$('#envLayout').addEventListener('change', () => { envCfg.layout = $('#envLayout').value; saveEnv(); });
 $('#envTitle').addEventListener('input', () => { envCfg.title = $('#envTitle').value; saveEnv(); envCache.clear(); renderEnvPreview(); });
 
 const examHall = room => {
@@ -1022,7 +1027,17 @@ function envelopes(period) {
   }
   return out;
 }
-let tMap = {};
+let tMap = {}, envSubjects = [];
+const splitKey = k => { const i = k.indexOf('|'); return [Number(k.slice(0, i)), k.slice(i + 1)]; };
+function subjectEnvelopes(grade, subj) {
+  return result.periods.flatMap(p => envelopes(p)).filter(e => e.grade === grade && e.subject === subj);
+}
+function selectedEnvelopes() {
+  const v = $('#envPeriod').value || '';
+  if (v.startsWith('p:')) return { list: envelopes(v.slice(2)), name: periodLabel(v.slice(2)) };
+  if (v.startsWith('s:')) { const [g, subj] = splitKey(v.slice(2)); return { list: subjectEnvelopes(g, subj), name: `${g}학년_${subj}` }; }
+  return { list: [], name: '' };
+}
 function subjInfo(grade, subj) {
   const k = grade + '|' + subj, c = envCfg.subj[k] || {};
   return { code: c.code || '', pages: c.pages || '', teacher: c.teacher !== undefined ? c.teacher : (tMap[k] || '') };
@@ -1037,20 +1052,31 @@ function renderEnvTab(keepView) {
     const a = agg.get(k); a.envs++; a.n += e.list.length; a.periods.add(periodLabel(p));
   }
   const rows = [...agg.values()].sort((a, b) => a.grade - b.grade || [...a.periods][0].localeCompare([...b.periods][0]) || a.subject.localeCompare(b.subject, 'ko'));
-  $('#envSubj').innerHTML = '<thead><tr><th>학년</th><th>과목</th><th>시험 교시</th><th>봉투</th><th>과목코드</th><th>문제면수</th><th>담당교사</th></tr></thead><tbody>' +
+  $('#envSubj').innerHTML = '<thead><tr><th>학년</th><th>과목</th><th>시험 교시</th><th>봉투</th><th>과목코드</th><th>문제면수</th><th>담당교사</th><th></th></tr></thead><tbody>' +
     rows.map(a => { const k = a.grade + '|' + a.subject, inf = subjInfo(a.grade, a.subject); return `<tr data-k="${esc(k)}">
       <td>${a.grade}학년</td><td><b>${esc(a.subject)}</b></td><td class="muted">${esc([...a.periods].join(', '))}</td><td>${a.envs}장 · ${a.n}명</td>
       <td><input type="text" class="sm" data-f="code" value="${esc(inf.code)}" placeholder="예: 1234"></td>
       <td><input type="text" class="sm" data-f="pages" value="${esc(inf.pages)}" placeholder="쪽 수" inputmode="numeric"></td>
-      <td><input type="text" data-f="teacher" value="${esc(inf.teacher)}" placeholder="담당교사"></td></tr>`; }).join('') + '</tbody>';
+      <td><input type="text" data-f="teacher" value="${esc(inf.teacher)}" placeholder="담당교사"></td>
+      <td style="white-space:nowrap"><button class="small envView">보기</button> <button class="small envOne">PDF</button></td></tr>`; }).join('') + '</tbody>';
+  $('#envSubj').querySelectorAll('.envOne').forEach(b => b.addEventListener('click', () => {
+    const [g, subj] = splitKey(b.closest('tr').dataset.k);
+    envPdfSave(subjectEnvelopes(g, subj), `시험지봉투_${g}학년_${fileSafe(subj)}.pdf`);
+  }));
+  $('#envSubj').querySelectorAll('.envView').forEach(b => b.addEventListener('click', () => {
+    $('#envPeriod').value = 's:' + b.closest('tr').dataset.k; renderEnvPreview();
+    $('#envs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
   $('#envSubj').querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
     const k = inp.closest('tr').dataset.k;
     envCfg.subj[k] = Object.assign(envCfg.subj[k] || {}, { [inp.dataset.f]: inp.value.trim() });
     saveEnv(); envCache.clear(); clearTimeout(renderEnvTab._t); renderEnvTab._t = setTimeout(renderEnvPreview, 400);
   }));
   const prev = $('#envPeriod').value;
-  $('#envPeriod').innerHTML = result.periods.map(p => `<option value="${p}">${periodLabel(p)}</option>`).join('');
-  if (keepView && result.periods.includes(prev)) $('#envPeriod').value = prev;
+  envSubjects = rows.map(a => a.grade + '|' + a.subject);
+  $('#envPeriod').innerHTML = `<optgroup label="과목별">${rows.map(a => `<option value="s:${esc(a.grade + '|' + a.subject)}">${a.grade}학년 ${esc(a.subject)}</option>`).join('')}</optgroup>` +
+    `<optgroup label="교시별">${result.periods.map(p => `<option value="p:${p}">${periodLabel(p)}</option>`).join('')}</optgroup>`;
+  if (keepView && [...$('#envPeriod').options].some(o => o.value === prev)) $('#envPeriod').value = prev;
   envCache.clear();
   renderEnvPreview();
 }
@@ -1161,43 +1187,74 @@ function envCanvas(e) {
   return envCache.get(key);
 }
 async function renderEnvPreview() {
-  const p = $('#envPeriod').value, box = $('#envs');
-  if (!p) { box.innerHTML = ''; return; }
+  const box = $('#envs');
+  if (!$('#envPeriod').value) { box.innerHTML = ''; return; }
+  const bySubj = $('#envPeriod').value.startsWith('s:');
   try { await document.fonts.load(`700 20px "Noto Sans KR"`); await document.fonts.load(`800 20px "Noto Sans KR"`); } catch (e) {}
-  const list = envelopes(p);
+  const list = selectedEnvelopes().list;
   $('#envInfo').textContent = `${list.length}장 · ${list.reduce((a, e) => a + e.list.length, 0)}명`;
   box.innerHTML = '';
   list.forEach(e => {
     const d = document.createElement('div'); d.className = 'room';
     const cv = envCanvas(e); d.appendChild(cv);
-    d.insertAdjacentHTML('beforeend', `<div class="row"><b>${esc(examHall(e.room))}</b><span class="meta">${esc(e.subject)} · ${e.list.length}명</span></div>`);
+    d.insertAdjacentHTML('beforeend', `<div class="row"><b>${esc(examHall(e.room))}</b><span class="meta">${bySubj ? esc(periodLabel(e.period)) : esc(e.subject)} · ${e.list.length}명</span></div>`);
     cv.addEventListener('click', () => { const z = $('#zoom'); z.querySelector('img').src = cv.toDataURL(); z.classList.remove('hidden'); });
     box.appendChild(d);
   });
 }
-async function envPdf(periods) {
+async function envPdf(envList) {
   const { jsPDF } = window.jspdf;
   await document.fonts.load(`700 20px "Noto Sans KR"`); await document.fonts.load(`800 20px "Noto Sans KR"`);
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const twoUp = (envCfg.layout || '2up') === '2up';
+  const pdf = new jsPDF({ orientation: twoUp ? 'portrait' : 'landscape', unit: 'mm', format: 'a4' });
   let n = 0;
-  for (const p of periods) for (const e of envelopes(p)) {
-    if (n++) pdf.addPage('a4', 'landscape');
+  for (const e of envList) {
     const cv = envCanvas(e);
-    pdf.addImage(cv, 'PNG', 0, 0, 297, 210, undefined, 'FAST');
+    if (twoUp) {
+      // A4 세로(210×297) 위·아래 반쪽(210×148.5)에 하나씩 — 봉투 비율(297:210)과 같아 그대로 축소됨
+      const slot = n % 2;
+      if (n && slot === 0) pdf.addPage('a4', 'portrait');
+      pdf.addImage(cv, 'PNG', 0, slot * 148.5, 210, 148.5, undefined, 'FAST');
+      if (slot === 0) {   // 가운데 자르는 선
+        pdf.setDrawColor(170); pdf.setLineWidth(0.2); pdf.setLineDashPattern([2, 2], 0);
+        pdf.line(4, 148.5, 206, 148.5); pdf.setLineDashPattern([], 0);
+      }
+    } else {
+      if (n) pdf.addPage('a4', 'landscape');
+      pdf.addImage(cv, 'PNG', 0, 0, 297, 210, undefined, 'FAST');
+    }
+    n++;
   }
   return n ? pdf.output('blob') : null;
 }
-async function envPdfSave(periods, name) {
+async function envPdfSave(envList, name) {
   busy(true, '봉투 PDF 만드는 중…');
   await new Promise(r => setTimeout(r, 40));
   let blob = null;
-  try { blob = await envPdf(periods); } catch (e) { busy(false); toast('PDF 오류: ' + e.message); return; }
+  try { blob = await envPdf(envList); } catch (e) { busy(false); toast('PDF 오류: ' + e.message); return; }
   busy(false);
   if (!blob) { toast('만들 봉투가 없습니다.'); return; }
   await saveFile(name, blob);
 }
-$('#envPdf').addEventListener('click', () => { const p = $('#envPeriod').value; if (p) envPdfSave([p], `시험지봉투_${fileSafe(periodLabel(p))}.pdf`); });
-$('#envAllPdf').addEventListener('click', () => envPdfSave(result.periods, '시험지봉투_전체.pdf'));
+$('#envPdf').addEventListener('click', () => { const sel = selectedEnvelopes(); if (sel.list.length) envPdfSave(sel.list, `시험지봉투_${fileSafe(sel.name)}.pdf`); });
+$('#envAllPdf').addEventListener('click', () => envPdfSave(result.periods.flatMap(p => envelopes(p)), '시험지봉투_전체.pdf'));
+$('#envZip').addEventListener('click', async () => {
+  busy(true, '과목별 PDF 만드는 중…');
+  try {
+    const zip = new JSZip();
+    let i = 0;
+    for (const k of envSubjects) {
+      const [g, subj] = splitKey(k);
+      $('#busy').textContent = `과목별 PDF 만드는 중… (${++i}/${envSubjects.length}) ${subj}`;
+      await new Promise(r => setTimeout(r, 20));
+      const blob = await envPdf(subjectEnvelopes(g, subj));
+      if (blob) zip.file(`${g}학년_${fileSafe(subj)}.pdf`, blob);
+    }
+    const out = await zip.generateAsync({ type: 'blob' });
+    busy(false);
+    await saveFile('시험지봉투_과목별.zip', out);
+  } catch (e) { busy(false); toast('ZIP 오류: ' + e.message); }
+});
 
 // ---------- 고사실 현황 ----------
 function renderSummary() {
