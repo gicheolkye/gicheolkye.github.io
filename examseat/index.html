@@ -258,6 +258,7 @@
         <button id="seatPdf">이 교시 PDF</button>
         <button id="seatAllPdf" class="primary">전체 교시 PDF (일괄 인쇄용)</button>
       </div>
+      <div class="ovr hidden" id="gatherBox" style="background:#f3f7ff;border:1px solid #d6e2fb"></div>
       <div class="ovr hidden" id="ovr"></div>
       <div class="rooms" id="rooms"></div>
     </div>
@@ -1024,6 +1025,79 @@
     return out;
   }
 
+  // 반 교실 시험이 섞인 반 찾기: 같은 교시에 한 반 안에서 서로 다른 과목을 반 교실에서 보는 경우
+  //  → [{grade, period, classes:{반: {과목: 인원}}, subjects:{과목: 인원}}]
+  const homeroomOf = (loc) => { const m = /([1-3])\s*학년\s*(\d+)\s*반/.exec(loc || ''); return m ? { grade: Number(m[1]), cls: Number(m[2]), room: m[1] + String(Number(m[2])).padStart(2, '0') } : null; };
+  function homeroomMix(grades) {
+    const out = [];
+    for (const g of grades) {
+      const t = g.timetable; if (!t) continue;
+      const h = t.rows[0].map(S);
+      for (const c of t.dataCols) {
+        const byCls = {};
+        for (let r = 1; r < t.rows.length; r++) {
+          const v = S(t.rows[r][c]); if (!v || v.includes('미응시')) continue;
+          const L = v.split('\n'); const hr = homeroomOf(L[2]); if (!hr) continue;
+          (byCls[hr.cls] = byCls[hr.cls] || {})[L[0].trim()] = (byCls[hr.cls][L[0].trim()] || 0) + 1;
+        }
+        const mixed = Object.entries(byCls).filter(([, s]) => Object.keys(s).length > 1);
+        if (!mixed.length) continue;
+        const classes = {}, subjects = {};
+        mixed.forEach(([cl, s]) => { classes[cl] = s; for (const k in s) subjects[k] = (subjects[k] || 0) + s[k]; });
+        out.push({ grade: g.grade, period: h[c], classes, subjects });
+      }
+    }
+    return out;
+  }
+  // 자동 추천: 과목마다 그 과목 학생이 가장 많은 (섞인) 반 교실로, 교실이 겹치지 않게
+  function suggestGather(mix) {
+    const rules = [], used = new Set();
+    const subs = Object.entries(mix.subjects).sort((a, b) => a[1] - b[1]);   // 적은 과목부터 자리 잡기
+    for (const [subj] of subs) {
+      const cands = Object.entries(mix.classes).map(([cl, s]) => [Number(cl), s[subj] || 0]).sort((a, b) => b[1] - a[1]);
+      const pick = cands.find(([cl]) => !used.has(cl));
+      if (!pick) continue;
+      used.add(pick[0]);
+      rules.push({ grade: mix.grade, period: mix.period, subject: subj, room: mix.grade + String(pick[0]).padStart(2, '0') });
+    }
+    return rules;
+  }
+  // 반 교실 시험 모으기 적용: rules = [{grade, period, subject, room:'205'}]
+  //  섞인 반 학생만 정한 교실로 옮기고, 학생이 들어오는 교실은 학번 순으로 좌석을 새로 매김
+  function applyHomeroomGather(grades, rules) {
+    const report = [];
+    const groups = {};
+    (rules || []).forEach(r => { const k = r.grade + '|' + r.period; (groups[k] = groups[k] || []).push(r); });
+    for (const k in groups) {
+      const [gg, period] = [Number(k.split('|')[0]), k.slice(k.indexOf('|') + 1)];
+      const g = grades.find(x => x.grade === gg); if (!g || !g.timetable) continue;
+      const t = g.timetable, h = t.rows[0].map(S), c = h.indexOf(period); if (c < 0) continue;
+      const iId = h.indexOf('학번');
+      const mix = homeroomMix([{ grade: gg, timetable: { rows: t.rows.map(r => r), dataCols: [c] } }])[0];
+      if (!mix) continue;
+      const mixedCls = new Set(Object.keys(mix.classes).map(Number));
+      const ruleOf = subj => groups[k].find(r => r.subject === subj);
+      const studs = [];
+      for (let r = 1; r < t.rows.length; r++) {
+        const v = S(t.rows[r][c]); if (!v || v.includes('미응시')) continue;
+        const L = v.split('\n'), hr = homeroomOf(L[2]); if (!hr) continue;
+        const rule = mixedCls.has(hr.cls) ? ruleOf(L[0].trim()) : null;
+        studs.push({ r, id: S(t.rows[r][iId]), subj: L[0].trim(), own: hr.room, dest: rule ? String(rule.room) : hr.room, L });
+      }
+      const affected = new Set();
+      studs.forEach(s => { if (s.dest !== s.own) { affected.add(s.dest); affected.add(s.own); } });
+      const byRoom = {};
+      studs.filter(s => affected.has(s.dest)).forEach(s => (byRoom[s.dest] = byRoom[s.dest] || []).push(s));
+      for (const room in byRoom) {
+        const list = byRoom[room].sort((a, b) => a.id.localeCompare(b.id));
+        const subjCnt = {};
+        list.forEach((s, i) => { s.L[2] = `${room} / ${String(i + 1).padStart(2, '0')}`; t.rows[s.r][c] = s.L.join('\n'); subjCnt[s.subj] = (subjCnt[s.subj] || 0) + 1; });
+        report.push({ grade: gg, period, room, total: list.length, subjects: subjCnt, movedIn: list.filter(s => s.own !== room).length });
+      }
+    }
+    return report;
+  }
+
   // 시험 일정표 데이터: 학년 × 교시 × 날짜 → 과목별 응시 인원
   function scheduleData(grades) {
     const dates = new Set(), out = [];
@@ -1173,7 +1247,7 @@
     return wb.xlsx.writeBuffer();
   }
 
-  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, timetableRecords, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook, buildStudentBook, studentCellText, studentTable, buildEnvelopeHwpx, scheduleData, schedDateLabel, buildScheduleWorkbook, applySubjectMoves, checkSubjectMove, slotKey, applyDateMap };
+  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, timetableRecords, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook, buildStudentBook, studentCellText, studentTable, buildEnvelopeHwpx, scheduleData, schedDateLabel, buildScheduleWorkbook, applySubjectMoves, checkSubjectMove, slotKey, applyDateMap, homeroomMix, suggestGather, applyHomeroomGather };
   if (typeof module !== 'undefined') module.exports = root.ExamCore;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1193,7 +1267,8 @@ try { waitPlaces = JSON.parse(localStorage.getItem('examseat.waitPlaces') || '{}
 const saveWaits = () => { try { localStorage.setItem('examseat.waitPlaces', JSON.stringify(waitPlaces)); } catch (e) {} };
 let overrides = [];
 let dateMap = {};    // 시험 날짜 바꾸기 {원래 'MM-DD(요)': 새 'MM-DD(요)'}
-let subjMoves = [];  // 과목 시험 시간 옮기기 {grade, subject, from, to}   // 고사실 수동 변경 {period, subject, from, to}
+let subjMoves = [];
+let gatherRules = []; // 반 교실 시험 모으기 {grade, period, subject, room}  // 과목 시험 시간 옮기기 {grade, subject, from, to}   // 고사실 수동 변경 {period, subject, from, to}
 let uid = 0;
 
 function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), ms); }
@@ -1345,6 +1420,10 @@ function run(keepView) {
   C.applyDateMap(grades, dateMap);
   const mvReport = C.applySubjectMoves(grades, subjMoves);
   mvReport.forEach((r, i) => { if (r.conflicts.length) warnings.push(`과목 옮기기 ${subjMoves[i].grade}학년 ${subjMoves[i].subject} → ${periodLabel(subjMoves[i].to)}: 그 시간에 다른 시험이 있는 ${r.conflicts.length}명은 옮기지 못했습니다 (${r.conflicts.slice(0, 3).join(', ')}${r.conflicts.length > 3 ? ' 등' : ''}).`); });
+  const mixes = C.homeroomMix(grades);
+  const gatherReport = C.applyHomeroomGather(grades, gatherRules);
+  const seatCap = Math.max(1, +$('#optRows').value || 6) * Math.max(1, +$('#optCols').value || 5);
+  gatherReport.forEach(r => { if (r.total > seatCap) warnings.push(`<b>${periodLabel(r.period)} ${roomLabel(r.room)}(${r.room})</b>: 반 교실 시험을 모아 ${r.total}명이 되어 좌석표 칸(${seatCap}칸)보다 많습니다. 좌석표는 분단을 늘려 그립니다.`); });
   const applied = C.applyRoomOverrides(grades, overrides);
   // 현황: 개인 시간표 기준(자기 반 교실 시험 포함). 시간표가 없으면 명렬표 기준
   const ttRecs = C.timetableRecords(grades);
@@ -1362,7 +1441,7 @@ function run(keepView) {
       cf.forEach(c => warnings.push(`<b>${periodLabel(p)} ${roomLabel(c.room)}(${c.room})</b>: ` + Object.entries(c.subjects).map(([s, n]) => `${s} ${n}명`).join(' + ') + ` 이(가) 같은 고사실에 배정되어 좌석 ${c.dup}개가 겹칩니다. 강좌목록의 장소를 확인하세요.`));
     }
   }
-  result = { grades, summary, periods, tts, conflicts, warnings, overrides, applied, waitPlaces, waits: C.waitList(grades), mvReport };
+  result = { grades, summary, periods, tts, conflicts, warnings, overrides, applied, waitPlaces, waits: C.waitList(grades), mvReport, mixes, gatherReport };
   renderResult(keepView);
 }
 
@@ -1386,7 +1465,8 @@ function renderResult(keepView) {
   fillClassSelect();
   renderTT();
   renderSummary();
-  $('#seatPeriod').innerHTML = R.periods.map(p => `<option value="${p}" ${R.conflicts[p] ? 'style="color:#a4461d"' : ''}>${periodLabel(p)}${R.conflicts[p] ? ' ⚠' : ''}</option>`).join('');
+  const mixP = new Set((R.mixes || []).map(m => m.period));
+  $('#seatPeriod').innerHTML = R.periods.map(p => `<option value="${p}" ${R.conflicts[p] ? 'style="color:#a4461d"' : ''}>${periodLabel(p)}${R.conflicts[p] ? ' ⚠' : ''}${mixP.has(p) ? ' · 섞인 반' : ''}</option>`).join('');
   if (keepView && R.periods.includes(prevPeriod)) $('#seatPeriod').value = prevPeriod;
   seatCache.clear();
   renderSeats();
@@ -2158,6 +2238,7 @@ function changeDate(cur, nd) {
   const swap = v => (typeof v === 'string' && v.startsWith(cur)) ? nd + v.slice(cur.length) : v;
   subjMoves.forEach(m => { m.from = swap(m.from); m.to = swap(m.to); });
   overrides.forEach(o => { o.period = swap(o.period); });
+  gatherRules.forEach(r => { r.period = swap(r.period); });
   const nw = {}; for (const [k, v] of Object.entries(waitPlaces)) { const p = k.split('|'); if (p[1]) p[1] = swap(p[1]); nw[p.join('|')] = v; } waitPlaces = nw; saveWaits();
   schedCfg.extraDates = (schedCfg.extraDates || []).map(d => d === cur ? nd : d); saveSched();
   recompute(`${C.schedDateLabel(cur)} 시험을 ${C.schedDateLabel(nd)}로 옮겼습니다.`);
@@ -2396,8 +2477,38 @@ function periodCanvases(period) {
   return out;
 }
 
+function renderGather(p) {
+  const box = $('#gatherBox');
+  const mixes = (result.mixes || []).filter(m => m.period === p);
+  const rules = gatherRules.filter(r => r.period === p);
+  box.classList.toggle('hidden', !mixes.length);
+  if (!mixes.length) { box.innerHTML = ''; return; }
+  box.innerHTML = mixes.map(mix => {
+    const nCls = Math.max(...C.classRows(result.grades.find(g => g.grade === mix.grade)).keys());
+    const roomOpts = [...Array(nCls).keys()].map(i => i + 1).map(cl => { const code = mix.grade + String(cl).padStart(2, '0'); return { code, label: `${mix.grade}학년 ${cl}반 교실 (${code})${mix.classes[cl] ? ' · 섞인 반' : ''}` }; });
+    const rep = (result.gatherReport || []).filter(r => r.grade === mix.grade && r.period === p);
+    return `<div class="row"><b>반 교실 시험 모으기 · ${mix.grade}학년</b><span class="muted" style="font-size:12.5px">한 반 안에서 과목이 섞인 반: ${Object.entries(mix.classes).map(([cl, s]) => `${cl}반(${Object.entries(s).map(([k, n]) => `${esc(k)} ${n}`).join('·')})`).join(', ')}</span><span class="spacer"></span><button class="small gSuggest" data-g="${mix.grade}">자동 추천</button>${rules.some(r => r.grade === mix.grade) ? `<button class="small gReset" data-g="${mix.grade}">되돌리기</button>` : ''}</div>
+      <div class="muted" style="font-size:12.5px;margin:4px 0">섞인 반 학생들만 과목별로 한 교실에 모읍니다. 나머지 반은 그대로입니다. 모인 교실은 학번 순으로 좌석을 새로 매깁니다.</div>
+      ${Object.entries(mix.subjects).map(([subj, n]) => { const cur = rules.find(r => r.grade === mix.grade && r.subject === subj); return `<div class="row" style="margin-top:4px"><span style="min-width:150px">${esc(subj)} <span class="muted">(섞인 반 ${n}명)</span> →</span><select class="gSel" data-g="${mix.grade}" data-s="${esc(subj)}"><option value="">각자 반 교실 (그대로)</option>${roomOpts.map(o => `<option value="${o.code}" ${cur && cur.room === o.code ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select></div>`; }).join('')}
+      ${rep.length ? `<div style="margin-top:6px;font-size:13px">결과: ${rep.map(r => `<b>${esc(roomLabel(r.room))}</b> ${Object.entries(r.subjects).map(([k, n]) => `${esc(k)} ${n}명`).join('+')}${r.total > Math.max(1, +$('#optRows').value || 6) * Math.max(1, +$('#optCols').value || 5) ? ' <span style="color:var(--warn)">⚠ 좌석 칸 초과</span>' : ''}`).join(' · ')}</div>` : ''}`;
+  }).join('<hr style="border:none;border-top:1px dashed #d6e2fb;margin:10px 0">');
+  box.querySelectorAll('.gSel').forEach(sel => sel.addEventListener('change', () => {
+    const g = +sel.dataset.g, subj = sel.dataset.s;
+    gatherRules = gatherRules.filter(r => !(r.grade === g && r.period === p && r.subject === subj));
+    if (sel.value) gatherRules.push({ grade: g, period: p, subject: subj, room: sel.value });
+    recompute(sel.value ? `${subj}: 섞인 반 학생을 ${roomLabel(sel.value)} 교실로 모았습니다.` : `${subj}: 각자 반 교실로 되돌렸습니다.`);
+  }));
+  box.querySelectorAll('.gSuggest').forEach(b => b.addEventListener('click', () => {
+    const g = +b.dataset.g, mix = mixes.find(m => m.grade === g);
+    gatherRules = gatherRules.filter(r => !(r.grade === g && r.period === p)).concat(C.suggestGather(mix));
+    recompute('과목별로 학생이 가장 많은 반 교실로 모았습니다.');
+  }));
+  box.querySelectorAll('.gReset').forEach(b => b.addEventListener('click', () => { const g = +b.dataset.g; gatherRules = gatherRules.filter(r => !(r.grade === g && r.period === p)); recompute('반 교실 시험 모으기를 되돌렸습니다.'); }));
+}
+
 async function renderSeats() {
   const p = $('#seatPeriod').value.replace(' ⚠', '');
+  if (p) renderGather(p);
   const box = $('#rooms');
   if (!p) { box.innerHTML = ''; return; }
   try { await document.fonts.load(`700 20px "Noto Sans KR"`); await document.fonts.load(`500 20px "Noto Sans KR"`); } catch (e) {}
