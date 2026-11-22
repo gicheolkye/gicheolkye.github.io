@@ -140,7 +140,7 @@
   .chip2:hover{border-color:var(--accent)}
   .chip2.sel{outline:2px solid var(--accent);background:var(--accent-soft)}
   .chip2.moved{border-color:#e7a37f;background:#fff7f2}
-  .chip2 em{font-style:normal;color:#e00000;font-weight:700}
+  .chip2 em{font-style:normal;color:#e00000;font-weight:700;white-space:nowrap}
   .timeGrid{display:grid;grid-template-columns:auto auto auto 1fr;gap:4px 8px;align-items:center;font-size:13px}
   .timeGrid input{width:74px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px}
   .envs{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-top:14px}
@@ -302,6 +302,9 @@
         <label class="muted" style="font-size:13px">날짜 추가 <input type="date" id="schedAddDate" style="font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px"></label>
         <button class="small" id="schedAddBtn">열 추가</button>
         <span class="muted" style="font-size:12.5px">맨 아래 점선 줄은 새 교시입니다. 과목을 놓으면 그 교시가 생깁니다.</span>
+        <span class="spacer"></span>
+        <label class="muted" style="font-size:13px">학년 직접 추가 <select id="schedAddGrade"></select></label>
+        <button class="small" id="schedAddGradeBtn">추가</button>
       </div>
       <div class="scroll" style="max-height:none"><table class="sched" id="schedGrid"></table></div>
       <div class="row" style="margin-top:14px">
@@ -320,7 +323,7 @@
           <label>교시별 시간</label><div><div class="timeGrid" id="schedTimes"></div><div class="muted" style="font-size:12px;margin-top:4px">시험 시간을 비우면 기본 시험 시간을 씁니다. 교시 수는 위 표의 학년 칸 <b>−/+</b>로 바꿉니다.</div></div>
           <label for="schedNotes">안내 문구</label><div><textarea id="schedNotes" rows="3" style="width:100%;max-width:620px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid #cfd3cf;border-radius:6px"></textarea><div class="muted" style="font-size:12px">한 줄에 하나씩. 맨 앞에 “등교 시각·학년별 재적 현황” 줄은 자동으로 들어갑니다.</div></div>
         </div>
-        <div style="margin-top:8px"><b style="font-size:13.5px">과목 학점</b> <span class="muted" style="font-size:12.5px">이동수업 과목은 강좌목록의 주당 시수로 미리 채웠습니다. 비우면 (학점) 없이 나옵니다.</span></div>
+        <div style="margin-top:8px"><b style="font-size:13.5px">과목 학점</b> <span class="muted" style="font-size:12.5px">이동수업 과목은 강좌목록의 주당 시수로 미리 채웠습니다. 비우면 (학점) 없이 나옵니다. 이름 칸을 비우면 흐린 글씨처럼 자동으로 띄어 씁니다.</span></div>
         <div class="scroll" style="max-height:300px;margin-top:6px"><table class="wait" id="schedCredits"></table></div>
       </details>
     </div>
@@ -1098,6 +1101,31 @@
     return report;
   }
 
+  // 과목명 띄어쓰기: 자주 쓰는 과목은 사전, 나머지는 '~와/~과' 뒤를 띄움(과학·과정·과제·과목 제외)
+  const SPACE_DICT = {
+    '매체의사소통': '매체 의사소통', '도시의미래탐구': '도시의 미래 탐구', '역사로탐구하는현대세계': '역사로 탐구하는 현대 세계',
+    '로봇과공학세계': '로봇과 공학 세계', '영어독해와작문': '영어 독해와 작문', '사회문제탐구': '사회 문제 탐구',
+    '지구시스템과학': '지구 시스템 과학', '인공지능수학': '인공지능 수학', '일본어회화': '일본어 회화', '중국어회화': '중국어 회화',
+    '스페인어회화': '스페인어 회화', '프랑스어회화': '프랑스어 회화', '독일어회화': '독일어 회화', '문학과영상': '문학과 영상',
+    '세계시민과지리': '세계 시민과 지리', '현대사회와윤리': '현대 사회와 윤리', '인문학과윤리': '인문학과 윤리',
+    '역학과에너지': '역학과 에너지', '물질과에너지': '물질과 에너지', '세포와물질대사': '세포와 물질대사',
+    '진로영어': '진로 영어', '심화영어': '심화 영어', '심화국어': '심화 국어', '경제수학': '경제 수학', '실용수학': '실용 수학',
+    '기후변화와환경생태': '기후 변화와 환경 생태', '여행지리': '여행 지리', '고전읽기': '고전 읽기', '주제탐구독서': '주제 탐구 독서',
+    '영어발표와토론': '영어 발표와 토론', '직무영어': '직무 영어', '수학과제탐구': '수학 과제 탐구', '과학과제연구': '과학 과제 연구'
+  };
+  function spaceSubject(name) {
+    const s = S(name); if (!s || /\s/.test(s)) return s;
+    const m = /^(.*?)([0-9ⅠⅡⅢⅣ]*)$/.exec(s), base = m[1], tail = m[2];
+    if (SPACE_DICT[base]) return SPACE_DICT[base] + tail;
+    let out = '';
+    for (let i = 0; i < base.length; i++) {
+      out += base[i];
+      const ch = base[i], nx = base[i + 1];
+      if ((ch === '와' || ch === '과') && i >= 2 && i < base.length - 1 && !'학정제목거'.includes(nx)) out += ' ';
+    }
+    return out + tail;
+  }
+
   // 시험 일정표 데이터: 학년 × 교시 × 날짜 → 과목별 응시 인원
   function scheduleData(grades) {
     const dates = new Set(), out = [];
@@ -1160,8 +1188,9 @@
           const rt = [];
           list.forEach((it, k) => {
             const cr = opt.credit(g.grade, it.subject);
-            rt.push({ text: (k ? '\n' : '') + it.subject + (cr ? `(${cr})` : ''), font: { size: 11 } });
-            if (opt.showAll || it.count < g.total) rt.push({ text: `[${it.count}명]`, font: { size: 11, bold: true, color: { argb: 'FFE00000' } } });
+            rt.push({ text: (k ? '\n' : '') + (it.disp || it.subject) + (cr ? `(${cr})` : ''), font: { size: 11 } });
+            const show = it.show !== undefined ? it.show : (opt.showAll || it.count < g.total);
+            if (show && it.count) rt.push({ text: ` [${it.count}명]`, font: { size: 11, bold: true, color: { argb: 'FFE00000' } } });
           });
           const cell = row.getCell(4 + i);
           cell.value = rt.length ? { richText: rt } : '';
@@ -1247,7 +1276,7 @@
     return wb.xlsx.writeBuffer();
   }
 
-  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, timetableRecords, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook, buildStudentBook, studentCellText, studentTable, buildEnvelopeHwpx, scheduleData, schedDateLabel, buildScheduleWorkbook, applySubjectMoves, checkSubjectMove, slotKey, applyDateMap, homeroomMix, suggestGather, applyHomeroomGather };
+  root.ExamCore = { S, detectKind, detectGrade, splitCourse, processCourses, processRoster, processTimetable, computeHighlights, buildSummary, seatData, seatConflicts, timetableRecords, convertCell, buildWorkbook, applyRoomOverrides, waitList, waitPlaceFor, classRows, buildClassWorkbook, buildStudentBook, studentCellText, studentTable, buildEnvelopeHwpx, scheduleData, schedDateLabel, buildScheduleWorkbook, applySubjectMoves, checkSubjectMove, slotKey, applyDateMap, spaceSubject, homeroomMix, suggestGather, applyHomeroomGather };
   if (typeof module !== 'undefined') module.exports = root.ExamCore;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -2099,7 +2128,7 @@ $('#stuXlsx').addEventListener('click', async () => {
 });
 
 // ---------- 일정표 ----------
-let schedCfg = { title: '', arrive: '07:40', showAll: false, times: {}, credits: {}, notes: '', logo: '', extraDates: [], dur: 50, bellBefore: 5, gradePeriods: {} };
+let schedCfg = { title: '', arrive: '07:40', showAll: false, times: {}, credits: {}, notes: '', logo: '', extraDates: [], dur: 50, bellBefore: 5, gradePeriods: {}, manual: {}, dispNames: {} };
 try { schedCfg = Object.assign(schedCfg, JSON.parse(localStorage.getItem('examseat.sched') || '{}')); } catch (e) {}
 const saveSched = () => { try { localStorage.setItem('examseat.sched', JSON.stringify(schedCfg)); } catch (e) { try { const c = Object.assign({}, schedCfg, { logo: '' }); localStorage.setItem('examseat.sched', JSON.stringify(c)); } catch (e2) {} } };
 const DEF_START = { 1: '08:25', 2: '09:40', 3: '10:55', 4: '12:10', 5: '14:00', 6: '15:05', 7: '16:10' };
@@ -2134,8 +2163,25 @@ $('#schedLogo').addEventListener('change', e => {
 $('#schedLogoDel').addEventListener('click', () => { schedCfg.logo = ''; saveSched(); $('#schedLogo').value = ''; toast('로고를 뺐습니다.'); });
 const creditOf = (g, subj, sd) => { const k = g + '|' + subj; if (schedCfg.credits[k] !== undefined) return schedCfg.credits[k]; const gg = sd && sd.grades.find(x => x.grade === g); return gg && gg.credits[subj] ? String(gg.credits[subj]) : ''; };
 const WD = '일월화수목금토';
+const dispOf = (g, subj) => { const v = (schedCfg.dispNames || {})[g + '|' + subj]; return v ? v : C.spaceSubject(subj); };
 function schedSD() {
   const sd = C.scheduleData(result.grades);
+  // 직접 입력한 학년(예: 이동수업이 없는 1학년)
+  for (const [gk, m] of Object.entries(schedCfg.manual || {})) {
+    const grade = Number(gk); if (sd.grades.some(g => g.grade === grade)) continue;
+    const cells = {}; let maxExamP = 0;
+    for (const [key, list] of Object.entries(m.cells || {})) {
+      if (!list || !list.length) continue;
+      cells[key] = list.map(it => ({ subject: it.subject, count: Number(it.count) || 0, manual: true }));
+      maxExamP = Math.max(maxExamP, Number(key.split('|')[1])); const d = key.split('|')[0]; if (!sd.dates.includes(d)) sd.dates.push(d);
+    }
+    sd.grades.push({ grade, total: Number(m.total) || 0, maxP: 2, maxExamP, cells, credits: {}, manual: true });
+  }
+  sd.grades.sort((a, b) => a.grade - b.grade);
+  sd.grades.forEach(g => { for (const k in g.cells) g.cells[k].forEach(it => {
+    it.disp = dispOf(g.grade, it.subject);
+    it.show = g.manual ? !!it.count && (schedCfg.showAll || !g.total || it.count < g.total) : (schedCfg.showAll || it.count < g.total);
+  }); });
   (schedCfg.extraDates || []).forEach(d => { if (!sd.dates.includes(d)) sd.dates.push(d); });
   const md = d => Number(d.slice(0, 2)) * 100 + Number(d.slice(3, 5));
   sd.dates.sort((a, b) => md(a) - md(b));
@@ -2154,14 +2200,14 @@ function renderSched() {
     for (let p = 1; p <= g.maxP + 1; p++) {
       const extra = p > g.maxP, tm = timeOf(p);
       html += `<tr class="g${g.grade}${extra ? ' extra' : ''}">`;
-      if (p === 1) html += `<td class="g hd" rowspan="${g.maxP + 1}">${g.grade}<div style="font-size:11px;font-weight:400;margin-top:6px;white-space:nowrap">교시 <button class="x" data-gp="${g.grade}" data-d="-1" title="마지막 교시 줄 빼기" style="font-size:14px;padding:0 4px">−</button><button class="x" data-gp="${g.grade}" data-d="1" title="교시 줄 추가" style="font-size:14px;padding:0 4px">+</button></div></td>`;
+      if (p === 1) html += `<td class="g hd" rowspan="${g.maxP + 1}">${g.grade}<div style="font-size:11px;font-weight:400;margin-top:6px;white-space:nowrap">교시 <button class="x" data-gp="${g.grade}" data-d="-1" title="마지막 교시 줄 빼기" style="font-size:14px;padding:0 4px">−</button><button class="x" data-gp="${g.grade}" data-d="1" title="교시 줄 추가" style="font-size:14px;padding:0 4px">+</button></div>${g.manual ? `<div style="font-size:11px;font-weight:400;margin-top:6px">직접 입력<br>재적 <input type="number" class="mTotal" data-g="${g.grade}" value="${g.total || ''}" style="width:52px;font-size:11px;padding:1px 3px">명<br><button class="x mDel" data-g="${g.grade}" style="font-size:11px;color:var(--warn)">학년 빼기</button></div>` : ''}</td>`;
       html += `<td class="p hd">${extra ? '+' : p}</td><td class="tm hd">${extra ? '새 교시' : `<small>(예비령 ${esc(tm.bell)})</small>${esc(tm.start)}~${esc(tm.end)}`}</td>`;
       for (const d of sd.dates) {
         const list = g.cells[d + '|' + p] || [];
         html += `<td class="slot" data-grade="${g.grade}" data-slot="${esc(d + p)}">` + list.map(it => {
-          const cr = creditOf(g.grade, it.subject, sd), showN = schedCfg.showAll || it.count < g.total;
-          return `<span class="chip2${movedKey.has(g.grade + '|' + it.subject + '|' + d + p) ? ' moved' : ''}" draggable="true" data-grade="${g.grade}" data-subject="${esc(it.subject)}" data-slot="${esc(d + p)}">${esc(it.subject)}${cr ? `(${esc(cr)})` : ''}${showN ? `<em>[${it.count}명]</em>` : ''}</span>`;
-        }).join('<br>') + '</td>';
+          const cr = creditOf(g.grade, it.subject, sd);
+          return `<span class="chip2${movedKey.has(g.grade + '|' + it.subject + '|' + d + p) ? ' moved' : ''}" draggable="true" data-grade="${g.grade}" data-subject="${esc(it.subject)}" data-slot="${esc(d + p)}">${esc(it.disp)}${cr ? `(${esc(cr)})` : ''}${it.show ? ` <em>[${it.count}명]</em>` : ''}${g.manual ? ` <button class="x mChipDel" title="빼기" style="font-size:12px;padding:0 2px">×</button>` : ''}</span>`;
+        }).join('<br>') + (g.manual && !extra ? `<div><button class="x mAdd" title="과목 추가" style="font-size:12px;color:var(--accent)">+ 과목</button></div>` : '') + '</td>';
       }
       html += '</tr>';
     }
@@ -2187,6 +2233,22 @@ function renderSched() {
     td.addEventListener('drop', e => { e.preventDefault(); td.classList.remove('over'); try { const d = JSON.parse(e.dataTransfer.getData('text/plain')); if (d.grade === +td.dataset.grade) doSubjectMove(d.grade, d.subject, d.from, td.dataset.slot); } catch (err) {} });
     td.addEventListener('click', () => { if (pickChip && pickChip.dataset.grade === td.dataset.grade) { const c = pickChip; clearPick(); doSubjectMove(+c.dataset.grade, c.dataset.subject, c.dataset.slot, td.dataset.slot); } });
   });
+  // 직접 입력 학년: 과목 추가·빼기, 재적, 학년 빼기
+  tbl.querySelectorAll('.mAdd').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation(); const td = b.closest('td'); if (td.querySelector('.mForm')) return;
+    const f = document.createElement('div'); f.className = 'mForm'; f.style.cssText = 'display:flex;gap:4px;justify-content:center;margin-top:4px';
+    f.innerHTML = '<input placeholder="과목명" style="width:100px;font-size:12px;padding:2px 4px"><input placeholder="인원" type="number" style="width:50px;font-size:12px;padding:2px 4px" title="일부 학생만 볼 때 인원(선택)"><button class="small" style="padding:1px 6px;font-size:12px">추가</button>';
+    td.appendChild(f); const [i1, i2, bt] = f.children; i1.focus();
+    const add = () => { const name = i1.value.trim(); if (!name) return; const key = td.dataset.slot.slice(0, 8) + '|' + td.dataset.slot.slice(8); const m = schedCfg.manual[td.dataset.grade]; (m.cells[key] = m.cells[key] || []).push({ subject: name, count: i2.value.trim() }); saveSched(); renderSched(); };
+    bt.addEventListener('click', ev => { ev.stopPropagation(); add(); });
+    [i1, i2].forEach(i => { i.addEventListener('click', ev => ev.stopPropagation()); i.addEventListener('keydown', ev => { if (ev.key === 'Enter') add(); if (ev.key === 'Escape') f.remove(); }); });
+  }));
+  tbl.querySelectorAll('.mChipDel').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation(); const ch = b.closest('.chip2'), m = schedCfg.manual[ch.dataset.grade], key = ch.dataset.slot.slice(0, 8) + '|' + ch.dataset.slot.slice(8);
+    m.cells[key] = (m.cells[key] || []).filter(it => it.subject !== ch.dataset.subject); saveSched(); renderSched();
+  }));
+  tbl.querySelectorAll('.mTotal').forEach(i => { i.addEventListener('click', e => e.stopPropagation()); i.addEventListener('change', () => { schedCfg.manual[i.dataset.g].total = i.value; saveSched(); renderSched(); }); });
+  tbl.querySelectorAll('.mDel').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); delete schedCfg.manual[b.dataset.g]; saveSched(); renderSched(); toast(`${b.dataset.g}학년(직접 입력)을 뺐습니다.`); }));
   tbl.querySelectorAll('[data-gp]').forEach(b => b.addEventListener('click', e => {
     e.stopPropagation();
     const g = sd.grades.find(x => x.grade === +b.dataset.gp), n = g.maxP + Number(b.dataset.d);
@@ -2196,6 +2258,10 @@ function renderSched() {
   }));
   tbl.querySelectorAll('[data-editdate]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); openDateEditor(b); }));
   tbl.querySelectorAll('[data-deldate]').forEach(b => b.addEventListener('click', () => { schedCfg.extraDates = schedCfg.extraDates.filter(x => x !== b.dataset.deldate); saveSched(); renderSched(); }));
+  // 학년 직접 추가 목록
+  const have = new Set(sd.grades.map(g => g.grade));
+  $('#schedAddGrade').innerHTML = [1, 2, 3].filter(g => !have.has(g)).map(g => `<option value="${g}">${g}학년</option>`).join('') || '<option value="">(모두 있음)</option>';
+  $('#schedAddGradeBtn').disabled = ![1, 2, 3].some(g => !have.has(g));
   // 시간 칸
   const maxP = Math.max(1, ...sd.grades.map(g => g.maxP));
   $('#schedTimes').innerHTML = '<span></span><span class="muted">시작</span><span class="muted">시험 시간(분)</span><span class="muted">예비령 · 끝 (자동)</span>' + [...Array(maxP).keys()].map(i => i + 1).map(p => { const t = timeOf(p); return `<b>${p}교시</b><input type="time" data-p="${p}" data-k="start" value="${esc(t.start)}" style="width:118px"><input type="number" min="10" max="180" data-p="${p}" data-k="dur" value="${t.durCustom ? t.dur : ''}" placeholder="${esc(schedCfg.dur || 50)}" style="width:70px"><span class="muted" style="white-space:nowrap">예비령 ${esc(t.bell)} · ${esc(t.start)}~${esc(t.end)}</span>`; }).join('');
@@ -2207,8 +2273,9 @@ function renderSched() {
   }));
   // 학점 표
   const subs = []; sd.grades.forEach(g => { const seen = new Set(); Object.values(g.cells).flat().forEach(it => { if (!seen.has(it.subject)) { seen.add(it.subject); subs.push({ grade: g.grade, subject: it.subject }); } }); });
-  $('#schedCredits').innerHTML = '<thead><tr><th>학년</th><th>과목</th><th>학점</th></tr></thead><tbody>' + subs.map(x => `<tr><td>${x.grade}학년</td><td>${esc(x.subject)}</td><td><input type="text" class="sm" data-k="${esc(x.grade + '|' + x.subject)}" value="${esc(creditOf(x.grade, x.subject, sd))}" style="max-width:70px"></td></tr>`).join('') + '</tbody>';
-  $('#schedCredits').querySelectorAll('input').forEach(inp => inp.addEventListener('change', () => { schedCfg.credits[inp.dataset.k] = inp.value.trim(); saveSched(); renderSched(); }));
+  $('#schedCredits').innerHTML = '<thead><tr><th>학년</th><th>과목</th><th>학점</th><th>일정표에 쓸 이름 (띄어쓰기)</th></tr></thead><tbody>' + subs.map(x => { const k = x.grade + '|' + x.subject; return `<tr><td>${x.grade}학년</td><td>${esc(x.subject)}</td><td><input type="text" class="sm cr" data-k="${esc(k)}" value="${esc(creditOf(x.grade, x.subject, sd))}" style="max-width:70px"></td><td><input type="text" class="dn" data-k="${esc(k)}" value="${esc((schedCfg.dispNames || {})[k] || '')}" placeholder="${esc(C.spaceSubject(x.subject))}" style="max-width:220px"></td></tr>`; }).join('') + '</tbody>';
+  $('#schedCredits').querySelectorAll('input.cr').forEach(inp => inp.addEventListener('change', () => { schedCfg.credits[inp.dataset.k] = inp.value.trim(); saveSched(); renderSched(); }));
+  $('#schedCredits').querySelectorAll('input.dn').forEach(inp => inp.addEventListener('change', () => { schedCfg.dispNames = Object.assign({}, schedCfg.dispNames, { [inp.dataset.k]: inp.value.trim() }); if (!inp.value.trim()) delete schedCfg.dispNames[inp.dataset.k]; saveSched(); renderSched(); }));
   renderMoves();
 }
 // ---------- 날짜 바꾸기 ----------
@@ -2240,12 +2307,20 @@ function changeDate(cur, nd) {
   overrides.forEach(o => { o.period = swap(o.period); });
   gatherRules.forEach(r => { r.period = swap(r.period); });
   const nw = {}; for (const [k, v] of Object.entries(waitPlaces)) { const p = k.split('|'); if (p[1]) p[1] = swap(p[1]); nw[p.join('|')] = v; } waitPlaces = nw; saveWaits();
-  schedCfg.extraDates = (schedCfg.extraDates || []).map(d => d === cur ? nd : d); saveSched();
+  schedCfg.extraDates = (schedCfg.extraDates || []).map(d => d === cur ? nd : d);
+  for (const m of Object.values(schedCfg.manual || {})) { const nc = {}; for (const [k, v] of Object.entries(m.cells || {})) nc[k.startsWith(cur + '|') ? nd + k.slice(cur.length) : k] = v; m.cells = nc; }
+  saveSched();
   recompute(`${C.schedDateLabel(cur)} 시험을 ${C.schedDateLabel(nd)}로 옮겼습니다.`);
 }
 
 function clearPick() { if (pickChip) pickChip.classList.remove('sel'); pickChip = null; document.querySelectorAll('td.slot.pick').forEach(td => td.classList.remove('pick')); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') clearPick(); });
+$('#schedAddGradeBtn').addEventListener('click', () => {
+  const g = $('#schedAddGrade').value; if (!g) return;
+  schedCfg.manual = Object.assign({}, schedCfg.manual, { [g]: { total: '', cells: {} } });
+  if (!(schedCfg.gradePeriods || {})[g]) schedCfg.gradePeriods = Object.assign({}, schedCfg.gradePeriods, { [g]: 2 });
+  saveSched(); renderSched(); toast(`${g}학년을 추가했습니다. 칸마다 ‘+ 과목’을 눌러 과목을 넣으세요.`, 4000);
+});
 $('#schedAddBtn').addEventListener('click', () => {
   const v = $('#schedAddDate').value; if (!v) { toast('추가할 날짜를 고르세요.'); return; }
   const dt = new Date(v + 'T00:00:00'), d = `${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}(${WD[dt.getDay()]})`;
@@ -2253,6 +2328,13 @@ $('#schedAddBtn').addEventListener('click', () => {
 });
 function doSubjectMove(grade, subject, from, to) {
   if (from === to) return;
+  const man = (schedCfg.manual || {})[grade];
+  if (man && !result.grades.some(x => x.grade === grade && x.timetable)) {   // 직접 입력 학년: 일정표 안에서만 옮김
+    const kf = from.slice(0, 8) + '|' + from.slice(8), kt = to.slice(0, 8) + '|' + to.slice(8);
+    const it = (man.cells[kf] || []).find(x => x.subject === subject); if (!it) return;
+    man.cells[kf] = man.cells[kf].filter(x => x !== it); (man.cells[kt] = man.cells[kt] || []).push(it);
+    saveSched(); renderSched(); toast(`${grade}학년 ${subject}: ${periodLabel(from)} → ${periodLabel(to)}`); return;
+  }
   const g = result.grades.find(x => x.grade === grade);
   const chk = C.checkSubjectMove(g, { grade, subject, from, to });
   if (chk.conflicts.length) { toast(`옮길 수 없습니다: ${periodLabel(to)}에 이미 다른 시험이 있는 학생 ${chk.conflicts.length}명 (${chk.conflicts.slice(0, 3).join(', ')}${chk.conflicts.length > 3 ? ' 등' : ''})`, 6000); return; }
@@ -2298,38 +2380,61 @@ async function drawSchedule() {
   const tTop = top0 + 30, colG = 9, colP = 7, colT = 33, nD = Math.max(1, sd.dates.length);
   const dW = (R - L - colG - colP - colT) / nD, headH = 15;
   const xs = [L, L + colG, L + colG + colP, L + colG + colP + colT]; for (let i = 1; i <= nD; i++) xs.push(xs[3] + dW * i);
-  // 칸 내용 줄 계산
-  let scale = 1;
-  const cellLines = (g, d, p, s) => {
-    const list = g.cells[d + '|' + p] || [], out = [];
-    x.font = `600 ${k(3.9 * s)}px ${FONT}`;
-    for (const it of list) {
-      const cr = creditOf(g.grade, it.subject, sd), name = it.subject + (cr ? `(${cr})` : ''), cnt = (schedCfg.showAll || it.count < g.total) ? `[${it.count}명]` : '';
-      const maxW = k(dW - 2.5), wN = x.measureText(name).width, wC = x.measureText(cnt).width;
-      // 조금 넘치는 정도면 글자를 줄여 한 줄로 두고(그릴 때 맞춤), 많이 길 때만 두 줄로 나눔
-      if (wN + wC <= maxW * 1.1) out.push([[name, '#000'], [cnt, '#e00000']]);
-      else if (wN <= maxW * 1.4) { out.push([[name, '#000']]); if (cnt) out.push([[cnt, '#e00000']]); }
-      else {   // 이름이 길면 가운데쯤에서 두 줄로 (원본 양식처럼 "역사로탐구하는 / 현대세계(3)")
-        const base = it.subject, cut = Math.ceil(base.length / 2);
-        const a = base.slice(0, cut), b = base.slice(cut) + (cr ? `(${cr})` : '');
-        out.push([[a, '#000']]);
-        if (x.measureText(b + cnt).width <= maxW) out.push([[b, '#000'], [cnt, '#e00000']]);
-        else { out.push([[b, '#000']]); if (cnt) out.push([[cnt, '#e00000']]); }
-      }
+  // 칸 내용 줄 계산: 표 전체에 하나의 글자 크기(fs mm)를 쓰고, 낱말 단위로 줄을 바꿈
+  const maxW = k(dW - 3);
+  const fontN = f => `600 ${k(f)}px ${FONT}`, fontC = f => `800 ${k(f)}px ${FONT}`;
+  const tw = (t, f, bold) => { x.font = bold ? fontC(f) : fontN(f); return x.measureText(t).width; };
+  // 한 과목 → 줄 목록 [[ [텍스트, 빨강?], ... ], ...], 넘치는 낱말이 있으면 over=true
+  const itemLines = (g, it, f) => {
+    const cr = creditOf(g.grade, it.subject, sd);
+    const words = (it.disp || it.subject).split(/\s+/).filter(Boolean);
+    if (cr) words[words.length - 1] += `(${cr})`;
+    const lines = []; let cur = '', over = false;
+    for (const w of words) {
+      const t = cur ? cur + ' ' + w : w;
+      if (tw(t, f) <= maxW) cur = t; else { if (cur) lines.push(cur); cur = w; if (tw(w, f) > maxW) over = true; }
     }
-    return out;
+    if (cur) lines.push(cur);
+    const out = lines.map(l => [[l, false]]);
+    const wraps = Math.max(0, lines.length - 1);   // 이름이 몇 번 줄바꿈 됐는지
+    if (it.show && it.count) {
+      const cnt = `[${it.count}명]`, last = out[out.length - 1];
+      if (tw(last[0][0] + ' ', f) + tw(cnt, f, true) <= maxW) { last[0][0] += ' '; last.push([cnt, true]); }
+      else out.push([[cnt, true]]);
+    }
+    return { lines: out, over, wraps };
   };
-  const layout = s => {
-    const rows = [];
+  const cellLines = (g, d, p, f) => {
+    const list = g.cells[d + '|' + p] || [], out = []; let over = false, wraps = 0;
+    list.forEach((it, i) => { const r = itemLines(g, it, f); if (r.over) over = true; wraps += r.wraps; r.lines.forEach((l, j) => out.push({ segs: l, gapBefore: i > 0 && j === 0 })); });
+    return { lines: out, over, wraps };
+  };
+  const notesN = schedNotes(sd).length;
+  const avail = 297 - 10 - tTop - headH - 6.5 * notesN - 4;
+  const layout = f => {
+    const lh = f * 1.42, gap = f * 0.35, pad = f * 1.4, minH = Math.max(18, f * 5.2);
+    const rows = []; let over = false, wraps = 0;
     for (const g of sd.grades) for (let p = 1; p <= g.maxP; p++) {
-      const n = Math.max(0, ...sd.dates.map(d => cellLines(g, d, p, s).length));
-      rows.push({ g, p, h: Math.max(26 * s, n * 5.6 * s + 6 * s) });
+      let h = minH;
+      for (const d of sd.dates) { const c = cellLines(g, d, p, f); if (c.over) over = true; wraps += c.wraps; const n = c.lines.length, gaps = c.lines.filter(l => l.gapBefore).length; h = Math.max(h, n * lh + gaps * gap + pad * 2); }
+      rows.push({ g, p, h });
     }
-    return rows;
+    return { rows, over, wraps, lh, gap, total: rows.reduce((a, r) => a + r.h, 0) };
   };
-  let rows = layout(1);
-  const avail = 297 - 12 - tTop - headH - 8 * (1 + schedNotes(sd).length);
-  while (rows.reduce((a, r) => a + r.h, 0) > avail && scale > 0.55) { scale -= 0.05; rows = layout(scale); }
+  // 글자 크기 고르기: 한 쪽에 들어가고 낱말이 칸을 넘지 않는 크기 중
+  // 과목명 줄바꿈이 가장 적은 크기(같으면 큰 크기). 3.3mm보다 작게는 줄바꿈을 줄이려고 줄이지 않음
+  let best = null;
+  for (let f = 4.2; f >= 2.4 - 1e-9; f = Math.round((f - 0.1) * 100) / 100) {
+    const Lf = layout(f);
+    if (Lf.over || Lf.total > avail) continue;
+    if (!best || Lf.wraps < best.L.wraps) best = { f, L: Lf };
+    if (f <= 3.3 && best) break;
+  }
+  if (!best) best = { f: 2.4, L: layout(2.4) };
+  let cfs = best.f, L0 = best.L;
+  // 남는 세로 공간은 줄 높이를 늘려 쪽을 채움(원본 양식처럼), 너무 늘어지지 않게 최대 1.8배
+  if (L0.total < avail) { const fct = Math.min(1.8, avail / L0.total); L0.rows.forEach(r => r.h *= fct); L0.total *= fct; }
+  const rows = L0.rows, scale = Math.min(1, cfs / 3.9);
   // 머리글
   x.fillStyle = '#fde1e4'; x.fillRect(k(L), k(tTop), k(R - L), k(headH)); x.fillStyle = '#000';
   x.font = `700 ${k(4.6)}px ${FONT}`;
@@ -2353,19 +2458,18 @@ async function drawSchedule() {
       x.fillStyle = '#1f5fd6'; x.font = `700 ${k(3.6 * Math.max(scale, .8))}px ${FONT}`; x.fillText(`(예비령 ${tm.bell})`, head(2), k(yy + r.h / 2 - 3.6));
       x.fillStyle = '#000'; x.font = `800 ${k(4.9 * Math.max(scale, .8))}px ${FONT}`; x.fillText(`${tm.start}~${tm.end}`, head(2), k(yy + r.h / 2 + 3));
       sd.dates.forEach((d, i) => {
-        const ls = cellLines(g, d, r.p, scale), lh = 5.6 * scale, y0 = yy + r.h / 2 - (ls.length - 1) * lh / 2;
-        ls.forEach((segs, j) => {
-          // 칸 너비를 넘는 줄은 글자를 줄여서 맞춤
-          let fsz = k(3.9 * scale);
-          const width = f => segs.reduce((a, [t, col]) => { x.font = `${col === '#000' ? 600 : 800} ${f}px ${FONT}`; return a + x.measureText(t).width; }, 0);
-          const maxW = k(dW - 2);
-          let tw = width(fsz);
-          if (tw > maxW) { fsz = fsz * maxW / tw; tw = width(fsz); }
-          let cx = head(3 + i) - tw / 2;
-          x.textAlign = 'left';
-          segs.forEach(([t, col]) => { x.fillStyle = col; x.font = `${col === '#000' ? 600 : 800} ${fsz}px ${FONT}`; x.fillText(t, cx, k(y0 + j * lh)); cx += x.measureText(t).width; });
-          x.textAlign = 'center';
+        const c = cellLines(g, d, r.p, cfs);
+        const blockH = c.lines.length * L0.lh + c.lines.filter(l => l.gapBefore).length * L0.gap;
+        let ly = yy + r.h / 2 - blockH / 2 + L0.lh / 2;
+        x.textAlign = 'left';
+        c.lines.forEach(ln => {
+          if (ln.gapBefore) ly += L0.gap;
+          const w = ln.segs.reduce((a, [t, red]) => a + tw(t, cfs, red), 0);
+          let cx = head(3 + i) - w / 2;
+          ln.segs.forEach(([t, red]) => { x.font = red ? fontC(cfs) : fontN(cfs); x.fillStyle = red ? '#e00000' : '#000'; x.fillText(t, cx, k(ly)); cx += x.measureText(t).width; });
+          ly += L0.lh;
         });
+        x.textAlign = 'center';
       });
       line(xs[1], yy + r.h, R, yy + r.h, 0.25);
       yy += r.h;
