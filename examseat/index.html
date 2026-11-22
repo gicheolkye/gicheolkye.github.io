@@ -205,16 +205,49 @@
     <div class="chips" id="chips"></div>
     <div class="warns hidden" id="warns"></div>
     <div class="tabs" id="tabs">
-      <button data-t="tt" class="on">개인 시간표</button>
-      <button data-t="sum">고사실별 현황</button>
-      <button data-t="wait">대기 장소</button>
-      <button data-t="seat">좌석표</button>
-      <button data-t="env">시험지 봉투</button>
-      <button data-t="stu">학생 조회</button>
-      <button data-t="sched">일정표</button>
+      <button data-t="sched" class="on">① 일정표</button>
+      <button data-t="tt">② 개인 시간표</button>
+      <button data-t="sum">③ 고사실별 현황</button>
+      <button data-t="seat">④ 좌석표</button>
+      <button data-t="wait">⑤ 대기 장소</button>
+      <button data-t="env">⑥ 시험지 봉투</button>
+      <button data-t="stu">⑦ 학생 조회</button>
     </div>
 
-    <div data-p="tt">
+    <div data-p="sched">
+      <p class="sub" style="margin-bottom:12px">불러온 학년의 시험 일정표를 학교 양식으로 만듭니다. 아래 표에서 <b>과목을 끌어다 다른 날짜·교시 칸에 놓으면</b>(또는 과목을 누른 뒤 옮길 칸을 누르면) 개인 시간표·고사실 현황·좌석표·봉투·학생 조회까지 모두 그 시간으로 바뀝니다. 그 시간에 이미 다른 시험이 있는 학생이 있으면 옮기지 않고 알려 줍니다.</p>
+      <div class="ovr hidden" id="mvList" style="margin:0 0 12px"></div>
+      <div class="row" style="margin-bottom:8px">
+        <label class="muted" style="font-size:13px">날짜 추가 <input type="date" id="schedAddDate" style="font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px"></label>
+        <button class="small" id="schedAddBtn">열 추가</button>
+        <span class="muted" style="font-size:12.5px">맨 아래 점선 줄은 새 교시입니다. 과목을 놓으면 그 교시가 생깁니다.</span>
+        <span class="spacer"></span>
+        <label class="muted" style="font-size:13px">학년 직접 추가 <select id="schedAddGrade"></select></label>
+        <button class="small" id="schedAddGradeBtn">추가</button>
+      </div>
+      <div class="scroll" style="max-height:none"><table class="sched" id="schedGrid"></table></div>
+      <div class="row" style="margin-top:14px">
+        <span class="muted" style="font-size:13px;min-width:74px">내려받기</span>
+        <button class="small primary" id="schedPdf">PDF</button>
+        <button class="small" id="schedPng">이미지(PNG)</button>
+        <button class="small" id="schedXlsx">엑셀(고칠 수 있음)</button>
+      </div>
+      <details class="opts" open style="margin-top:14px"><summary><b>일정표 꾸미기</b> — 제목·시간·학점·안내 문구</summary>
+        <div class="envCfg" style="margin-top:10px">
+          <label for="schedTitle">제목</label><input type="text" id="schedTitle">
+          <label>학교 로고</label><div class="row"><input type="file" id="schedLogo" accept="image/*" style="font-size:12.5px"><button class="small" id="schedLogoDel">로고 빼기</button><span class="muted" style="font-size:12px">제목 왼쪽에 들어갑니다(선택). 이 브라우저에 기억됩니다.</span></div>
+          <label for="schedArrive">등교 시각</label><input type="text" id="schedArrive" style="max-width:120px">
+          <label>인원 표시</label><label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" id="schedShowAll" style="width:auto"> 학년 전체가 보는 과목도 [명] 표시</label>
+          <label>시험 시간</label><div class="row" style="gap:8px;font-size:13px">기본 <input type="number" id="schedDur" min="10" max="180" style="width:70px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px">분 · 예비령은 시작 <input type="number" id="schedBell" min="0" max="30" style="width:60px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px">분 전</div>
+          <label>교시별 시간</label><div><div class="timeGrid" id="schedTimes"></div><div class="muted" style="font-size:12px;margin-top:4px">시험 시간을 비우면 기본 시험 시간을 씁니다. 교시 수는 위 표의 학년 칸 <b>−/+</b>로 바꿉니다.</div></div>
+          <label for="schedNotes">안내 문구</label><div><textarea id="schedNotes" rows="3" style="width:100%;max-width:620px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid #cfd3cf;border-radius:6px"></textarea><div class="muted" style="font-size:12px">한 줄에 하나씩. 맨 앞에 “등교 시각·학년별 재적 현황” 줄은 자동으로 들어갑니다.</div></div>
+        </div>
+        <div style="margin-top:8px"><b style="font-size:13.5px">과목 학점</b> <span class="muted" style="font-size:12.5px">이동수업 과목은 강좌목록의 주당 시수로 미리 채웠습니다. 비우면 (학점) 없이 나옵니다. 이름 칸을 비우면 흐린 글씨처럼 자동으로 띄어 씁니다.</span></div>
+        <div class="scroll" style="max-height:300px;margin-top:6px"><table class="wait" id="schedCredits"></table></div>
+      </details>
+    </div>
+
+    <div data-p="tt" class="hidden">
       <div class="row">
         <select id="ttGrade"></select>
         <select id="ttClass"></select>
@@ -293,39 +326,6 @@
         <button class="small primary" id="envHwpxAll">전체 한 파일</button>
       </div>
       <div class="envs" id="envs"></div>
-    </div>
-
-    <div data-p="sched" class="hidden">
-      <p class="sub" style="margin-bottom:12px">불러온 학년의 시험 일정표를 학교 양식으로 만듭니다. 아래 표에서 <b>과목을 끌어다 다른 날짜·교시 칸에 놓으면</b>(또는 과목을 누른 뒤 옮길 칸을 누르면) 개인 시간표·고사실 현황·좌석표·봉투·학생 조회까지 모두 그 시간으로 바뀝니다. 그 시간에 이미 다른 시험이 있는 학생이 있으면 옮기지 않고 알려 줍니다.</p>
-      <div class="ovr hidden" id="mvList" style="margin:0 0 12px"></div>
-      <div class="row" style="margin-bottom:8px">
-        <label class="muted" style="font-size:13px">날짜 추가 <input type="date" id="schedAddDate" style="font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px"></label>
-        <button class="small" id="schedAddBtn">열 추가</button>
-        <span class="muted" style="font-size:12.5px">맨 아래 점선 줄은 새 교시입니다. 과목을 놓으면 그 교시가 생깁니다.</span>
-        <span class="spacer"></span>
-        <label class="muted" style="font-size:13px">학년 직접 추가 <select id="schedAddGrade"></select></label>
-        <button class="small" id="schedAddGradeBtn">추가</button>
-      </div>
-      <div class="scroll" style="max-height:none"><table class="sched" id="schedGrid"></table></div>
-      <div class="row" style="margin-top:14px">
-        <span class="muted" style="font-size:13px;min-width:74px">내려받기</span>
-        <button class="small primary" id="schedPdf">PDF</button>
-        <button class="small" id="schedPng">이미지(PNG)</button>
-        <button class="small" id="schedXlsx">엑셀(고칠 수 있음)</button>
-      </div>
-      <details class="opts" open style="margin-top:14px"><summary><b>일정표 꾸미기</b> — 제목·시간·학점·안내 문구</summary>
-        <div class="envCfg" style="margin-top:10px">
-          <label for="schedTitle">제목</label><input type="text" id="schedTitle">
-          <label>학교 로고</label><div class="row"><input type="file" id="schedLogo" accept="image/*" style="font-size:12.5px"><button class="small" id="schedLogoDel">로고 빼기</button><span class="muted" style="font-size:12px">제목 왼쪽에 들어갑니다(선택). 이 브라우저에 기억됩니다.</span></div>
-          <label for="schedArrive">등교 시각</label><input type="text" id="schedArrive" style="max-width:120px">
-          <label>인원 표시</label><label style="display:flex;gap:6px;align-items:center;margin:0;color:var(--ink)"><input type="checkbox" id="schedShowAll" style="width:auto"> 학년 전체가 보는 과목도 [명] 표시</label>
-          <label>시험 시간</label><div class="row" style="gap:8px;font-size:13px">기본 <input type="number" id="schedDur" min="10" max="180" style="width:70px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px">분 · 예비령은 시작 <input type="number" id="schedBell" min="0" max="30" style="width:60px;font:inherit;font-size:13px;padding:4px 6px;border:1px solid #cfd3cf;border-radius:6px">분 전</div>
-          <label>교시별 시간</label><div><div class="timeGrid" id="schedTimes"></div><div class="muted" style="font-size:12px;margin-top:4px">시험 시간을 비우면 기본 시험 시간을 씁니다. 교시 수는 위 표의 학년 칸 <b>−/+</b>로 바꿉니다.</div></div>
-          <label for="schedNotes">안내 문구</label><div><textarea id="schedNotes" rows="3" style="width:100%;max-width:620px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid #cfd3cf;border-radius:6px"></textarea><div class="muted" style="font-size:12px">한 줄에 하나씩. 맨 앞에 “등교 시각·학년별 재적 현황” 줄은 자동으로 들어갑니다.</div></div>
-        </div>
-        <div style="margin-top:8px"><b style="font-size:13.5px">과목 학점</b> <span class="muted" style="font-size:12.5px">이동수업 과목은 강좌목록의 주당 시수로 미리 채웠습니다. 비우면 (학점) 없이 나옵니다. 이름 칸을 비우면 흐린 글씨처럼 자동으로 띄어 씁니다.</span></div>
-        <div class="scroll" style="max-height:300px;margin-top:6px"><table class="wait" id="schedCredits"></table></div>
-      </details>
     </div>
 
     <div data-p="stu" class="hidden">
