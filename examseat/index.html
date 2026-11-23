@@ -61,7 +61,16 @@
   .chip b{display:block;font-size:19px;color:var(--ink);font-weight:700;line-height:1.2}
   .warns{background:var(--warn-soft);border:1px solid #efcfbd;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;color:#5c2a12}
   .warns b{color:var(--warn)}
-  .warns ul{margin:6px 0 0;padding-left:18px}
+  .warns ul{margin:8px 0 0;padding:0;list-style:none}
+  .warns li.wi{display:flex;gap:10px;align-items:flex-start;padding:10px 10px;border-top:1px dashed #efcfbd;border-radius:6px;cursor:pointer;line-height:1.6;transition:background .12s}
+  .warns li.wi:first-child{border-top:none}
+  .warns li.wi:hover{background:#f8e0d2}
+  .warns .wk{flex:0 0 auto;font-size:11.5px;font-weight:700;color:#fff;background:var(--warn);border-radius:5px;padding:1px 7px;margin-top:2px;white-space:nowrap}
+  .warns .wk.k-mix{background:#3b6fd6}.warns .wk.k-cap{background:#b07a00}.warns .wk.k-move{background:#6b4c8a}.warns .wk.k-data{background:#68706c}
+  .warns .wt{display:block;font-weight:700;color:#5c2a12}
+  .warns .wgo{display:inline-block;margin-top:2px;font-size:12.5px;font-weight:700;color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+  .room.flash{animation:fl 1.6s ease-out}
+  @keyframes fl{0%{box-shadow:0 0 0 4px #e7a37f}100%{box-shadow:0 0 0 0 transparent}}
   .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:4px 0 14px}
   .tabs button{border:none;border-bottom:2.5px solid transparent;border-radius:0;background:none;padding:9px 14px;color:var(--muted);font-weight:500}
   .tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
@@ -1437,28 +1446,28 @@ function run(keepView) {
     if (s.roster) {
       out.roster = C.processRoster(s.roster.rows, out.course ? out.course.map : null);
       if (out.course && out.roster.unmatched.size)
-        warnings.push(`${g}학년 명렬표에서 강좌목록과 짝이 맞지 않는 과목·분반: ` + [...out.roster.unmatched].map(([k, n]) => `${k}(${n}명)`).join(', ') + ' → 고사실이 "미응시"로 표시됩니다.');
+        warnings.push({ kind: 'data', label: '파일 확인', title: `${g}학년 명렬표 ↔ 강좌목록`, body: '강좌목록과 짝이 맞지 않는 과목·분반: ' + [...out.roster.unmatched].map(([k, n]) => `${esc(k)}(${n}명)`).join(', ') + ' → 고사실이 "미응시"로 표시됩니다.', go: { files: true }, goText: '올린 파일 확인하기' });
     }
     if (s.timetable) {
       out.timetable = C.processTimetable(s.timetable.rows, out.roster ? out.roster.records : []);
       if (out.roster && out.course && out.timetable.missing.size)
-        warnings.push(`${g}학년 시간표에서 고사실을 찾지 못한 칸: ` + [...out.timetable.missing].map(([k, n]) => `${k}(${n}칸)`).join(', ') + ' → 원래 값 그대로 두었습니다.');
+        warnings.push({ kind: 'data', label: '파일 확인', title: `${g}학년 개인 시간표`, body: '고사실을 찾지 못한 칸: ' + [...out.timetable.missing].map(([k, n]) => `${esc(k)}(${n}칸)`).join(', ') + ' → 원래 값 그대로 두었습니다.', go: { tab: 'tt' }, goText: '② 개인 시간표에서 보기' });
     }
     grades.push(out);
   }
   C.applyDateMap(grades, dateMap);
   const mvReport = C.applySubjectMoves(grades, subjMoves);
-  mvReport.forEach((r, i) => { if (r.conflicts.length) warnings.push(`과목 옮기기 ${subjMoves[i].grade}학년 ${subjMoves[i].subject} → ${periodLabel(subjMoves[i].to)}: 그 시간에 다른 시험이 있는 ${r.conflicts.length}명은 옮기지 못했습니다 (${r.conflicts.slice(0, 3).join(', ')}${r.conflicts.length > 3 ? ' 등' : ''}).`); });
+  mvReport.forEach((r, i) => { if (r.conflicts.length) warnings.push({ kind: 'move', label: '과목 옮기기', title: `${subjMoves[i].grade}학년 ${esc(subjMoves[i].subject)} → ${periodLabel(subjMoves[i].to)}`, body: `그 시간에 다른 시험이 있는 ${r.conflicts.length}명은 옮기지 못했습니다 (${esc(r.conflicts.slice(0, 3).join(', '))}${r.conflicts.length > 3 ? ' 등' : ''}).`, go: { tab: 'sched', el: '#mvList' }, goText: '① 일정표에서 확인하기' }); });
   const mixes = C.homeroomMix(grades);
   const gatherReport = C.applyHomeroomGather(grades, gatherRules);
   // 한 반 안에서 과목이 섞인 반 교실 시험(아직 모으지 않은 것)
   mixes.forEach(m => {
     if (gatherRules.some(r => r.grade === m.grade && r.period === m.period)) return;
     const det = Object.entries(m.classes).map(([cl, sj]) => `${cl}반(${Object.entries(sj).map(([k, n]) => `${esc(k)} ${n}`).join('·')})`).join(', ');
-    warnings.push(`<b>${periodLabel(m.period)} ${m.grade}학년</b>: 한 반 교실 안에서 서로 다른 과목을 보는 반이 있습니다 — ${det}. <a href="#" data-goseat="${esc(m.period)}">④ 좌석표에서 반 교실 시험 모으기 →</a>`);
+    warnings.push({ kind: 'mix', label: '섞인 반', title: `${periodLabel(m.period)} · ${m.grade}학년`, body: `한 반 교실 안에서 서로 다른 과목을 보는 반이 있습니다 — ${det}`, go: { tab: 'seat', period: m.period, el: '#gatherBox' }, goText: '④ 좌석표에서 반 교실 시험 모으기' });
   });
   const seatCap = Math.max(1, +$('#optRows').value || 6) * Math.max(1, +$('#optCols').value || 5);
-  gatherReport.forEach(r => { if (r.total > seatCap) warnings.push(`<b>${periodLabel(r.period)} ${roomLabel(r.room)}(${r.room})</b>: 반 교실 시험을 모아 ${r.total}명이 되어 좌석표 칸(${seatCap}칸)보다 많습니다. 좌석표는 분단을 늘려 그립니다.`); });
+  gatherReport.forEach(r => { if (r.total > seatCap) warnings.push({ kind: 'cap', label: '좌석 칸 초과', title: `${periodLabel(r.period)} · ${roomLabel(r.room)}(${r.room})`, body: `반 교실 시험을 모아 ${r.total}명이 되어 좌석표 칸(${seatCap}칸)보다 많습니다. 좌석표는 분단을 늘려 그립니다.`, go: { tab: 'seat', period: r.period, el: '#gatherBox' }, goText: '④ 좌석표에서 모으기 다시 보기' }); });
   const applied = C.applyRoomOverrides(grades, overrides);
   // 현황: 개인 시간표 기준(자기 반 교실 시험 포함). 시간표가 없으면 명렬표 기준
   const ttRecs = C.timetableRecords(grades);
@@ -1473,7 +1482,7 @@ function run(keepView) {
     const cf = C.seatConflicts(C.seatData(tts, p));
     if (cf.length) {
       conflicts[p] = cf;
-      cf.forEach(c => warnings.push(`<b>${periodLabel(p)} ${roomLabel(c.room)}(${c.room})</b>: ` + Object.entries(c.subjects).map(([s, n]) => `${s} ${n}명`).join(' + ') + ` 이(가) 같은 고사실에 배정되어 좌석 ${c.dup}개가 겹칩니다. 강좌목록의 장소를 확인하세요.`));
+      cf.forEach(c => warnings.push({ kind: 'room', label: '고사실 겹침', title: `${periodLabel(p)} · ${roomLabel(c.room)}(${c.room})`, body: Object.entries(c.subjects).map(([s, n]) => `${esc(s)} ${n}명`).join(' + ') + ` 이(가) 같은 고사실에 배정되어 좌석 ${c.dup}개가 겹칩니다.`, go: { tab: 'seat', period: p, room: c.room }, goText: '④ 좌석표에서 고사실 바꾸기' }));
     }
   }
   result = { grades, summary, periods, tts, conflicts, warnings, overrides, applied, waitPlaces, waits: C.waitList(grades), mvReport, mixes, gatherReport };
@@ -1492,13 +1501,10 @@ function renderResult(keepView) {
   ].map(([k, v]) => `<div class="chip">${k}<b>${v}</b></div>`).join('');
   const w = $('#warns');
   w.classList.toggle('hidden', !R.warnings.length);
-  w.innerHTML = `<b>확인이 필요한 부분 ${R.warnings.length}건</b><ul>${R.warnings.map(x => `<li>${x}</li>`).join('')}</ul>`;
-  w.querySelectorAll('[data-goseat]').forEach(a => a.addEventListener('click', e => {
-    e.preventDefault();
-    $('#tabs').querySelector('[data-t=seat]').click();
-    $('#seatPeriod').value = a.dataset.goseat; renderSeats();
-    $('#gatherBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }));
+  w.innerHTML = `<b>확인이 필요한 부분 ${R.warnings.length}건</b> <span class="muted" style="font-size:12.5px">누르면 고칠 수 있는 곳으로 이동합니다</span><ul>${R.warnings.map((x, i) => typeof x === 'string'
+    ? `<li class="wi"><span>${x}</span></li>`
+    : `<li class="wi" data-wi="${i}"><span class="wk k-${x.kind}">${esc(x.label)}</span><span><span class="wt">${x.title}</span>${x.body}<br><span class="wgo">${esc(x.goText || '이동')} →</span></span></li>`).join('')}</ul>`;
+  w.querySelectorAll('li[data-wi]').forEach(li => li.addEventListener('click', () => goWarning(R.warnings[+li.dataset.wi].go)));
   // 시간표 탭
   const sel = $('#ttGrade');
   sel.innerHTML = R.grades.filter(g => g.timetable).map(g => `<option value="${g.grade}">${g.grade}학년 개인 시간표</option>`).join('');
@@ -1516,6 +1522,20 @@ function renderResult(keepView) {
   renderEnvTab(keepView);
   renderSched();
   if (!keepView) $('#resultCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// 확인이 필요한 부분 → 고칠 곳으로 이동
+async function goWarning(go) {
+  if (!go) return;
+  if (go.files) { $('#fileTable').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  $('#tabs').querySelector(`[data-t=${go.tab}]`).click();
+  if (go.period && go.tab === 'seat') { $('#seatPeriod').value = go.period; await renderSeats(); }
+  let target = go.el ? $(go.el) : null;
+  if (go.room) target = document.querySelector(`#rooms .room[data-room="${CSS.escape(go.room)}"]`) || target;
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.remove('flash'); void target.offsetWidth; target.classList.add('flash');
+  } else $('#tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // 탭
@@ -2633,7 +2653,7 @@ async function renderSeats() {
   $('#seatInfo').textContent = `${items.length}개 고사실 · ${items.reduce((a, b) => a + b.list.length, 0)}명`;
   box.innerHTML = '';
   items.forEach(it => {
-    const d = document.createElement('div'); d.className = 'room' + (bad.has(it.room) ? ' bad' : '');
+    const d = document.createElement('div'); d.className = 'room' + (bad.has(it.room) ? ' bad' : ''); d.dataset.room = it.room;
     d.appendChild(it.canvas);
     const subj = [...new Set(it.list.map(s => s.subject))].join(', ');
     const movable = !/학년/.test(it.room);
