@@ -1451,6 +1451,12 @@ function run(keepView) {
   mvReport.forEach((r, i) => { if (r.conflicts.length) warnings.push(`과목 옮기기 ${subjMoves[i].grade}학년 ${subjMoves[i].subject} → ${periodLabel(subjMoves[i].to)}: 그 시간에 다른 시험이 있는 ${r.conflicts.length}명은 옮기지 못했습니다 (${r.conflicts.slice(0, 3).join(', ')}${r.conflicts.length > 3 ? ' 등' : ''}).`); });
   const mixes = C.homeroomMix(grades);
   const gatherReport = C.applyHomeroomGather(grades, gatherRules);
+  // 한 반 안에서 과목이 섞인 반 교실 시험(아직 모으지 않은 것)
+  mixes.forEach(m => {
+    if (gatherRules.some(r => r.grade === m.grade && r.period === m.period)) return;
+    const det = Object.entries(m.classes).map(([cl, sj]) => `${cl}반(${Object.entries(sj).map(([k, n]) => `${esc(k)} ${n}`).join('·')})`).join(', ');
+    warnings.push(`<b>${periodLabel(m.period)} ${m.grade}학년</b>: 한 반 교실 안에서 서로 다른 과목을 보는 반이 있습니다 — ${det}. <a href="#" data-goseat="${esc(m.period)}">④ 좌석표에서 반 교실 시험 모으기 →</a>`);
+  });
   const seatCap = Math.max(1, +$('#optRows').value || 6) * Math.max(1, +$('#optCols').value || 5);
   gatherReport.forEach(r => { if (r.total > seatCap) warnings.push(`<b>${periodLabel(r.period)} ${roomLabel(r.room)}(${r.room})</b>: 반 교실 시험을 모아 ${r.total}명이 되어 좌석표 칸(${seatCap}칸)보다 많습니다. 좌석표는 분단을 늘려 그립니다.`); });
   const applied = C.applyRoomOverrides(grades, overrides);
@@ -1487,6 +1493,12 @@ function renderResult(keepView) {
   const w = $('#warns');
   w.classList.toggle('hidden', !R.warnings.length);
   w.innerHTML = `<b>확인이 필요한 부분 ${R.warnings.length}건</b><ul>${R.warnings.map(x => `<li>${x}</li>`).join('')}</ul>`;
+  w.querySelectorAll('[data-goseat]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault();
+    $('#tabs').querySelector('[data-t=seat]').click();
+    $('#seatPeriod').value = a.dataset.goseat; renderSeats();
+    $('#gatherBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }));
   // 시간표 탭
   const sel = $('#ttGrade');
   sel.innerHTML = R.grades.filter(g => g.timetable).map(g => `<option value="${g.grade}">${g.grade}학년 개인 시간표</option>`).join('');
